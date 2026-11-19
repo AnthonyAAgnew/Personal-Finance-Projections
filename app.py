@@ -15,6 +15,7 @@ reference and can save the edits as a small override file that ``extends`` it.
 from __future__ import annotations
 
 import hmac
+import json
 import sys
 from datetime import date
 from dataclasses import replace
@@ -48,7 +49,10 @@ def _fresh_engine() -> None:
 _fresh_engine()
 
 from stats_projections import ScenarioError, compare, load_scenario, simulate, summarize
-from stats_projections.config import _merge, career_info, compose, from_dict
+from stats_projections.config import _merge, career_info, compose, from_dict, load_raw
+from stats_projections.life_plan import (KIND_OF as LP_KIND_OF, KINDS as LP_KINDS,
+                                         LABELS as LP_LABELS, build as lp_build,
+                                         checks as lp_checks, describe as lp_describe)
 from stats_projections.edit import diff, to_dict
 from stats_projections.report import (
     COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
@@ -125,14 +129,25 @@ def run_sensitivity(s, steps: Steps):
 
 
 def load_all(mode: str, profile: Path | None = None, life=(), strategy: Path | None = None,
-             career: Path | None = None) -> dict[str, tuple[Path, object]]:
+             career: Path | None = None, plans_json: str = "[]") -> dict[str, tuple[Path, object]]:
     """The options to compare in each mode.
 
     * Careers: every career file on the profile, plus life events and one strategy.
     * Strategies: one career on the profile, plus life events, under every strategy.
+    * Life plans: plans you build (career, place, strategy, timeline of life events).
     * Life scenarios: the standalone files in scenarios/.
     """
     out, errors = {}, []
+    if mode == "Life plans":
+        for plan in json.loads(plans_json):
+            try:
+                s = lp_build(plan, profile, CAREER_DIR, LOCATION_DIR, STRATEGY_DIR)
+                out[s.name] = (CAREER_DIR / f"{plan['career']}.yaml", s)
+            except (ScenarioError, KeyError, ValueError) as exc:
+                errors.append(f"{plan.get('name', 'Plan')}: {exc}")
+        for e in errors:
+            st.error(e)
+        return out
     if mode == "Careers":
         items = [(f, (profile, f, *life, *([strategy] if strategy else [])), {})
                  for f in sorted(CAREER_DIR.glob("*.yaml"))]
@@ -238,11 +253,13 @@ with setup:
     setup_left, setup_right = st.columns(2)
 
 with setup_left:
-    MODES = ["Careers", "Strategies", "Life scenarios"]
+    MODES = ["Careers", "Strategies", "Life plans", "Life scenarios"]
     mode = st.radio("Compare", MODES, horizontal=True, key=wk("mode"),
                     index=_idx(MODES, lambda m: m == pv("mode")),
                     help="Careers: your profile under each career path. Strategies: one career "
-                         "under each finance strategy (FIRE, coast...). Life scenarios: the "
+                         "under each finance strategy (FIRE, coast...). Life plans: two or three "
+                         "plans you build, each with its own career, place, strategy and "
+                         "timeline of life events. Life scenarios: the "
                          "standalone files in scenarios/.")
     profile_file, life_files, strategy_file, career_file = None, [], None, None
     location_file = None
@@ -258,31 +275,165 @@ with setup_left:
             career_file = st.selectbox(
                 "Career", careers, format_func=file_name, key=wk("career"),
                 index=_idx(careers, lambda c: c.stem == pv("career", "rd_engineer")))
-        life_options = sorted(LIFE_DIR.glob("*.yaml"))
-        life_files = st.multiselect("Life events", life_options, key=wk("life"),
-                                    default=[f for f in life_options if f.stem in pv("life", [])],
-                                    format_func=file_name,
-                                    help="Layered on every option: partner, kids, moving abroad.")
-        loc_options = [None, *sorted(LOCATION_DIR.glob("*.yaml"))]
-        location_file = st.selectbox(
-            "Location after the Ph.D.", loc_options, key=wk("location"),
-            index=_idx(loc_options, lambda f: _stem(f) == pv("location")),
-            format_func=lambda f: "Irvine (profile)" if f is None else file_name(f),
-            help="Pay, living costs and state taxes relative to Irvine, from the start of "
-                 "your career. Applied after life events, so a partner's joint return keeps "
-                 "the new state's taxes.")
-        if location_file and any(f.stem.startswith("expat") for f in life_files):
-            st.warning("Moving abroad replaces the US location, so the location is ignored.")
-            location_file = None
-        if location_file:
-            life_files = [*life_files, location_file]
-        if mode == "Careers":
-            strategies = sorted(STRATEGY_DIR.glob("*.yaml"))
-            strategy_file = st.selectbox(
-                "Finance strategy", strategies, format_func=file_name, key=wk("strategy"),
-                index=_idx(strategies, lambda g: g.stem == pv("strategy", "work_to_65")))
+        if mode != "Life plans":
+            life_options = sorted(LIFE_DIR.glob("*.yaml"))
+            life_files = st.multiselect("Life events", life_options, key=wk("life"),
+                                        default=[f for f in life_options if f.stem in pv("life", [])],
+                                        format_func=file_name,
+                                        help="Layered on every option: partner, kids, moving abroad.")
+            loc_options = [None, *sorted(LOCATION_DIR.glob("*.yaml"))]
+            location_file = st.selectbox(
+                "Location after the Ph.D.", loc_options, key=wk("location"),
+                index=_idx(loc_options, lambda f: _stem(f) == pv("location")),
+                format_func=lambda f: "Irvine (profile)" if f is None else file_name(f),
+                help="Pay, living costs and state taxes relative to Irvine, from the start of "
+                     "your career. Applied after life events, so a partner's joint return keeps "
+                     "the new state's taxes.")
+            if location_file and any(f.stem.startswith("expat") for f in life_files):
+                st.warning("Moving abroad replaces the US location, so the location is ignored.")
+                location_file = None
+            if location_file:
+                life_files = [*life_files, location_file]
+            if mode == "Careers":
+                strategies = sorted(STRATEGY_DIR.glob("*.yaml"))
+                strategy_file = st.selectbox(
+                    "Finance strategy", strategies, format_func=file_name, key=wk("strategy"),
+                    index=_idx(strategies, lambda g: g.stem == pv("strategy", "work_to_65")))
 
-scenarios = load_all(mode, profile_file, tuple(life_files), strategy_file, career_file)
+DEFAULT_LIFE_PLANS = [
+    {"name": "R&D engineer, family", "career": "rd_engineer", "location": None,
+     "strategy": "work_to_65",
+     "items": [{"kind": "partner", "age": 30}, {"kind": "child", "age": 32},
+               {"kind": "home", "age": 34}]},
+    {"name": "Tech/AI in Texas, family", "career": "tech_ai_health", "location": "texas",
+     "strategy": "work_to_65",
+     "items": [{"kind": "partner", "age": 30}, {"kind": "child", "age": 32},
+               {"kind": "home", "age": 34, "amount": 600000}]},
+    {"name": "R&D engineer, no kids, retire at 55", "career": "rd_engineer", "location": None,
+     "strategy": "work_to_65",
+     "items": [{"kind": "partner", "age": 30}, {"kind": "retire", "age": 55}]},
+]
+LP_COLS = ["Event", "Age", "Amount", "Years", "± years"]
+
+
+def life_plan_builder(profile_file) -> list[dict]:
+    """Two or three plans, each a career, place, strategy and a timeline of life events."""
+    a0p = int(load_raw(profile_file).get("start_age") or 0)
+    saved = PLAN.get("life_plans") or DEFAULT_LIFE_PLANS
+    st.markdown("**Life plans**: give each plan its own career, place, strategy and life "
+                "events at the ages you choose. Every plan uses the same random markets.")
+    n = st.radio("Plans to compare", [2, 3], horizontal=True, key=wk("lp_n"),
+                 index=1 if len(saved) > 2 else 0)
+    careers = sorted(CAREER_DIR.glob("*.yaml"))
+    locs = [None, *sorted(LOCATION_DIR.glob("*.yaml"))]
+    strats = sorted(STRATEGY_DIR.glob("*.yaml"))
+    specs = []
+    for i, tab in enumerate(st.tabs([f"Plan {chr(65 + i)}" for i in range(n)])):
+        d = saved[i] if i < len(saved) else DEFAULT_LIFE_PLANS[min(i, 2)]
+        with tab:
+            name = st.text_input("Name", d.get("name", f"Plan {chr(65 + i)}"),
+                                 key=wk(f"lp_name{i}"))
+            c1, c2, c3 = st.columns(3)
+            car = c1.selectbox("Career", careers, format_func=file_name, key=wk(f"lp_car{i}"),
+                               index=_idx(careers, lambda f: f.stem == d.get("career")))
+            loc = c2.selectbox("Location", locs, key=wk(f"lp_loc{i}"),
+                               format_func=lambda f: "Irvine (profile)" if f is None
+                               else file_name(f),
+                               index=_idx(locs, lambda f: _stem(f) == d.get("location")))
+            strat = c3.selectbox("Finance strategy", strats, format_func=file_name,
+                                 key=wk(f"lp_str{i}"),
+                                 index=_idx(strats, lambda f: f.stem == (d.get("strategy")
+                                                                         or "work_to_65")))
+            df = pd.DataFrame([{"Event": LP_LABELS[it["kind"]], "Age": it.get("age"),
+                                "Amount": it.get("amount"), "Years": it.get("years"),
+                                "± years": it.get("jitter", 0)}
+                               for it in d.get("items", []) if it.get("kind") in LP_LABELS],
+                              columns=LP_COLS)
+            for c in LP_COLS[1:]:
+                df[c] = pd.to_numeric(df[c], errors="coerce").astype("float64")
+            df["Event"] = df["Event"].astype("object")
+            ed = st.data_editor(
+                df, num_rows="dynamic", hide_index=True, width="stretch",
+                key=wk(f"lp_items{i}"),
+                column_config={
+                    "Event": st.column_config.SelectboxColumn(
+                        "Event", options=list(LP_LABELS.values()), required=True, width="medium"),
+                    "Age": st.column_config.NumberColumn("Age", min_value=a0p, max_value=94,
+                                                         step=1, format="%d", required=True),
+                    "Amount": st.column_config.NumberColumn(
+                        "Amount", min_value=0, step=1000, format="%,.0f",
+                        help="Partner pay ($/yr), home price, purchase or inheritance ($), "
+                             "or part-time share of full pay (%). Blank uses the default."),
+                    "Years": st.column_config.NumberColumn(
+                        "Years", min_value=1, max_value=20, step=1, format="%d",
+                        help="Career break length. Blank = 1 year."),
+                    "± years": st.column_config.NumberColumn(
+                        "± years", min_value=0, max_value=5, step=1, format="%d",
+                        help="Uncertainty in the timing: each simulated life draws an age "
+                             "within this many years of the one you set."),
+                })
+            items = []
+            for _, r in ed.iterrows():
+                if not isinstance(r["Event"], str) or r["Event"] not in LP_KIND_OF \
+                        or pd.isna(r["Age"]):
+                    continue
+                it = {"kind": LP_KIND_OF[r["Event"]], "age": int(r["Age"])}
+                if pd.notna(r["Amount"]) and r["Amount"]:
+                    it["amount"] = float(r["Amount"])
+                if pd.notna(r["Years"]) and r["Years"]:
+                    it["years"] = int(r["Years"])
+                if pd.notna(r["± years"]) and r["± years"]:
+                    it["jitter"] = int(r["± years"])
+                items.append(it)
+            specs.append({"name": name.strip() or f"Plan {chr(65 + i)}", "career": car.stem,
+                          "location": _stem(loc), "strategy": _stem(strat), "items": items})
+            st.caption(lp_describe(specs[-1]).capitalize() + ".")
+    seen = set()
+    for sp in specs:
+        base_n, k = sp["name"], 2
+        while sp["name"] in seen:
+            sp["name"] = f"{base_n} ({k})"
+            k += 1
+        seen.add(sp["name"])
+
+    pts = [{"Plan": sp["name"], "Age": it["age"], "Event": LP_LABELS[it["kind"]],
+            "Label": LP_LABELS[it["kind"]].replace("Partner moves in", "Partner")
+            .replace("Child born", "Child").replace("Buy a home", "Home")}
+           for sp in specs for it in sp["items"]]
+    if pts:
+        tl = pd.DataFrame(pts).sort_values(["Plan", "Age"])
+        tl["Up"] = tl.groupby("Plan").cumcount() % 2 == 0     # alternate labels above/below
+        order = [sp["name"] for sp in specs]
+        y = alt.Y("Plan:N", sort=order, title=None, axis=None)
+        hi = max(70, int(tl["Age"].max()) + 5)
+        x = alt.X("Age:Q", scale=alt.Scale(domain=[a0p, hi]), title="Age")
+        base_c = alt.Chart(tl)
+        chart = alt.layer(
+            base_c.mark_circle(size=110, opacity=0.9).encode(
+                x=x, y=y, color=alt.Color("Event:N", legend=None),
+                tooltip=["Plan:N", "Event:N", "Age:Q"]),
+            base_c.transform_filter("datum.Up").mark_text(dy=-13, fontSize=10).encode(
+                x=x, y=y, text="Label:N"),
+            base_c.transform_filter("!datum.Up").mark_text(dy=15, fontSize=10).encode(
+                x=x, y=y, text="Label:N"),
+            alt.Chart(pd.DataFrame({"Plan": order, "Age": [a0p] * len(order)})).mark_text(
+                align="left", dy=-30, fontSize=11, fontWeight="bold").encode(
+                x=x, y=y, text="Plan:N"),
+        ).properties(height=90 * len(specs))
+        st.altair_chart(chart, width="stretch")
+    st.caption("Add a row for each event (+ at the bottom of the table); select a row and "
+               "press Delete to remove it. Partner, children, home and moving abroad use the "
+               "files in life/ (costs, taxes, timing) moved to your ages.")
+    return specs
+
+
+life_specs: list[dict] = []
+if mode == "Life plans":
+    with setup:
+        life_specs = life_plan_builder(profile_file)
+
+scenarios = load_all(mode, profile_file, tuple(life_files), strategy_file, career_file,
+                     json.dumps(life_specs))
 if not scenarios:
     st.error("No valid scenario or career files found.")
     st.stop()
@@ -301,9 +452,14 @@ with setup_right:
         st.caption(f"{len(names)} careers available; the six core paths are preselected.")
     else:
         default_others = others
-    if "chosen" in PLAN:
+    if "chosen" in PLAN and PLAN.get("mode") == mode:
         default_others = [n for n in PLAN["chosen"] if n in others]
-    chosen = st.multiselect("Compare with", others, default=default_others, key=wk("chosen"))
+    if mode == "Life plans":
+        chosen = others
+        st.caption("Every plan is compared with the baseline plan. Build the plans below.")
+    else:
+        chosen = st.multiselect("Compare with", others, default=default_others,
+                                key=wk("chosen"))
 
     base_file, base = scenarios[base_name]
     save_dir = {"Careers": CAREER_DIR, "Life scenarios": SCENARIO_DIR}.get(mode)
@@ -364,7 +520,7 @@ with sim:
 
 loc_label = "Irvine" if not location_file else file_name(location_file)
 summary_bits = [f"**{base_name}** vs {len(chosen)} other{'s' if len(chosen) != 1 else ''}"]
-if mode != "Life scenarios":
+if mode in ("Careers", "Strategies"):
     summary_bits.append(loc_label)
     if strategy_file is not None:
         summary_bits.append(file_name(strategy_file))
@@ -387,6 +543,8 @@ current_plan = {
     "dof": float(returns.dof), "inflation": float(infl_mean), "inflation_sd": float(infl_sd),
     "stress": stress_name,
 }
+if mode == "Life plans":
+    current_plan["life_plans"] = life_specs
 if st.session_state.get("tree_spec"):
     current_plan["tree"] = st.session_state["tree_spec"]
 elif PLAN.get("tree"):
@@ -466,10 +624,12 @@ tab_names = ["Results", "Milestones", "History", "Lifestyle", "Hours", "Cash flo
 if profile_file:
     tab_names.insert(5, "Assumptions")
     tab_names.insert(1, "Decide")
+if mode == "Life plans":
+    tab_names.append("Life checks")
 TAB_GROUPS = {
     "Overview": ["Results", "Milestones", "History"],
     "Compare": ["Decide", "Sensitivity"],
-    "Plan": ["What if", "Lifestyle", "Hours", "Cash flow"],
+    "Plan": ["Life checks", "What if", "Lifestyle", "Hours", "Cash flow"],
     "Details": ["Assumptions", "Files"],
 }
 tabs = {}
@@ -727,7 +887,7 @@ with tab_edit:
                           "repo (shared server files would be visible to everyone and lost on "
                           "redeploy).")
         elif save_dir is None:
-            csave.caption("In Strategies mode, download the change and save it as a career or "
+            csave.caption(f"In {mode} mode, download the change and save it as a career or "
                           "strategy file yourself.")
         else:
             target_file = save_dir / fname
@@ -1641,6 +1801,97 @@ if profile_file:
 
 
 # ----------------------------------------------------------------------------
+# Life checks: how much a life plan leans on its timing and on markets
+# ----------------------------------------------------------------------------
+
+if "Life checks" in tabs:
+    with tabs["Life checks"]:
+        st.markdown("How much does each plan lean on its assumptions? Each check moves one life "
+                    "event a few years earlier or later, or leaves it out, with everything else "
+                    "(and the random markets) unchanged. Market checks lay each stress test "
+                    "over the plan.")
+        spec_names = [sp["name"] for sp in life_specs if sp["name"] in scenarios]
+        if not spec_names:
+            st.info("Build a valid plan in the Setup panel first.")
+        else:
+            lc1, lc2 = st.columns([2, 1])
+            lc_pick = lc1.selectbox("Plan", spec_names, key="lc_plan")
+            lc_shift = lc2.number_input("Shift (years)", 1, 10, 3, key="lc_shift")
+            lc_mk = st.checkbox("Also run the market stress tests", value=True, key="lc_mk")
+            if st.button("Run the checks", type="primary"):
+                spec = next(sp for sp in life_specs if sp["name"] == lc_pick)
+                plan_s = shared(scenarios[lc_pick][1])
+                pa0 = plan_s.start_age or 0
+                col = int(np.clip(65 - pa0, 0, plan_s.horizon_years))
+                col85 = int(np.clip(85 - pa0, 0, plan_s.horizon_years))
+
+                def lc_row(label, r_):
+                    nw = r_.net_worth[:, col]
+                    return {"Check": label, "Median at 65": float(np.median(nw)),
+                            "P10 at 65": float(np.percentile(nw, 10)),
+                            "Median at 85": float(np.median(r_.net_worth[:, col85])),
+                            "Cash crunch": float(r_.p_fail)}
+
+                with st.spinner("Running each check..."):
+                    rows = [lc_row("The plan as set", run(plan_s))]
+                    notes = []
+                    for label, v in lp_checks(spec, int(lc_shift)):
+                        try:
+                            vs = lp_build(v, profile_file, CAREER_DIR, LOCATION_DIR, STRATEGY_DIR)
+                        except (ScenarioError, ValueError) as exc:
+                            notes.append(f"{label}: skipped ({exc})")
+                            continue
+                        rows.append(lc_row(label, run(shared(vs))))
+                    if lc_mk:
+                        rv = next((e for e in plan_s.events if e.name == "Retire"), None)
+                        ry = rv.year if rv else max(plan_s.horizon_years - 30, 1)
+                        cs = next((x.start_year for x in plan_s.income
+                                   if x.name == "Career pay"), 0)
+                        for nm, stv in stress_presets(cs, ry).items():
+                            if stv:
+                                rows.append(lc_row(f"Market: {nm}",
+                                                   run(replace(plan_s, stress=stv))))
+                ref = rows[0]
+                for r_ in rows:
+                    r_["Change in median"] = r_["Median at 65"] - ref["Median at 65"]
+                    r_["Change in crunch"] = r_["Cash crunch"] - ref["Cash crunch"]
+                st.session_state["lc_result"] = (lc_pick, rows, notes)
+            res_lc = st.session_state.get("lc_result")
+            if res_lc and res_lc[0] == lc_pick:
+                _, rows, notes = res_lc
+                df_lc = pd.DataFrame(rows)
+                lc_cols = ["Check", "Median at 65", "Change in median", "P10 at 65",
+                           "Median at 85", "Cash crunch", "Change in crunch"]
+                st.dataframe(df_lc[[c for c in lc_cols if c in df_lc]],
+                             hide_index=True, width="stretch", column_config={
+                                 **{c: st.column_config.NumberColumn(format="$%,.0f")
+                                    for c in ("Median at 65", "Change in median", "P10 at 65",
+                                              "Median at 85")},
+                                 "Cash crunch": st.column_config.NumberColumn(format="percent"),
+                                 "Change in crunch": st.column_config.NumberColumn(
+                                     format="percent")})
+                bars = df_lc.iloc[1:].copy()
+                bars["Direction"] = np.where(bars["Change in median"] >= 0, "Better", "Worse")
+                order = bars.sort_values("Change in median")["Check"].tolist()
+                show_chart(alt.Chart(bars).mark_bar().encode(
+                    y=alt.Y("Check:N", sort=order, title=None, axis=alt.Axis(labelLimit=200)),
+                    x=alt.X("Change in median:Q", title="Change in median net worth at 65",
+                            axis=alt.Axis(format="$,.2s")),
+                    color=alt.Color("Direction:N", scale=alt.Scale(
+                        domain=["Better", "Worse"], range=["#2a9d5c", "#d64541"])),
+                    tooltip=["Check:N", alt.Tooltip("Change in median:Q", format="$,.0f"),
+                             alt.Tooltip("Change in crunch:Q", format="+.1%")],
+                ).properties(height=26 * len(bars) + 40), width="stretch")
+                worst = bars.sort_values("Change in median").iloc[0]
+                st.caption(f"The plan leans most on: **{worst['Check']}** "
+                           f"({money(float(worst['Change in median']))} at 65). "
+                           "A check that also raises the cash-crunch chance a lot is one to "
+                           "keep a buffer for.")
+                for n_ in notes:
+                    st.caption(n_)
+
+
+# ----------------------------------------------------------------------------
 # Cash flow Sankey
 # ----------------------------------------------------------------------------
 
@@ -1786,6 +2037,12 @@ if profile_file:
             show_info(career_file, True)
         for n in [base_name, *chosen]:
             show_info(scenarios[n][0], n == base_name)
+        if mode == "Life plans":
+            st.subheader("Life plans")
+            for sp in life_specs:
+                st.markdown(f"**{sp['name']}**: {file_name(CAREER_DIR / (sp['career'] + '.yaml'))}"
+                            f", {sp['location'] or 'Irvine'}, {sp['strategy']}; "
+                            f"{lp_describe(sp)}.")
         if life_files or strategy_file:
             st.subheader("Add-ons")
             for f in [*life_files, *([strategy_file] if strategy_file else [])]:

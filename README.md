@@ -25,6 +25,16 @@ python -m streamlit run app.py
   - a **Career assumptions** tab listing every sourced number and every guess
     (marked CHECK).
 - **Life scenarios mode:** the standalone files in `scenarios/`.
+- **Life plans mode:** build two or three plans, each with its own career,
+  location, finance strategy and a timeline of life events at the ages you
+  choose: partner (with their pay), up to three children, buying a home (with
+  its price), moving abroad, a big purchase, an inheritance, a career break,
+  going part-time and the age you retire. Each event can carry +- years of
+  timing uncertainty. Every tab then compares the plans. The **Life checks**
+  tab (Plan group) moves each event a few years earlier or later, leaves it
+  out, and runs the market stress tests, showing how much the median at 65,
+  the median at 85 and the cash-crunch chance move. Plans are saved with a
+  saved plan (`stats_projections/life_plan.py`).
 - **What if:** edit a copy of the reference, then save the change as a small
   override file that `extends` it.
 - **Sensitivity:** a tornado chart for any option. Simulation-settings sliders change
@@ -333,6 +343,7 @@ print(summarize(base).p_fail, compare(base, home).delta)
 | `stats_projections/sensitivity.py` | One-at-a-time sensitivity and tornado chart |
 | `stats_projections/edit.py` | Scenario to file data, and minimal override diffs |
 | `stats_projections/storage.py` | Saved plans, snapshots and check-ins (local folder or gist) |
+| `stats_projections/life_plan.py` | Life plans: timeline of life events at chosen ages, and what-if checks |
 | `app.py` | Streamlit front end |
 | `profiles/`, `careers/`, `data/` | You, career paths, tax table |
 | `stats_projections/cli.py` | Command line |
