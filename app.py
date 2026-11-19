@@ -54,7 +54,9 @@ from stats_projections.report import (
     COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
     debt_metrics, hours_metrics, income_milestones, net_worth_milestones, strategy_metrics,
     tier_shares)
-from stats_projections.decisions import RULES as DP_RULES, decide as dp_decide
+from stats_projections.decisions import (MEASURES as DP_MEASURES, Condition as DPCondition,
+                                         Step as DPStep, branch_summary as dp_branches,
+                                         decide_tree as dp_tree)
 from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, criteria_values, pareto, score
 from stats_projections.storage import (GistStore, LocalStore, StorageError, percentile_of,
                                        to_todays_dollars, years_between)
@@ -385,6 +387,10 @@ current_plan = {
     "dof": float(returns.dof), "inflation": float(infl_mean), "inflation_sd": float(infl_sd),
     "stress": stress_name,
 }
+if st.session_state.get("tree_spec"):
+    current_plan["tree"] = st.session_state["tree_spec"]
+elif PLAN.get("tree"):
+    current_plan["tree"] = PLAN["tree"]
 
 store, store_password, store_note = get_store()
 store_open = store is not None and (not store_password or st.session_state.get("store_ok"))
@@ -1443,53 +1449,195 @@ if profile_file:
         st.markdown("**Frontier:** " + ", ".join(s_.name for s_, f in zip(scored, front) if f))
 
         st.divider()
-        st.subheader("Decision point")
-        st.markdown("Keep an option open: follow path A, and at a chosen age switch to path B on "
-                    "the lives where you can afford to. Both paths run on the same random draws, "
-                    "so each life's luck before and after the choice is the same.")
+        st.subheader("Decision tree")
+        st.markdown("Plan your choices ahead: start on one path, and at the ages you pick, switch "
+                    "the lives that meet your rules (an offer came through, pay or savings above "
+                    "a level). Later steps can apply only to lives that switched, or stayed, at "
+                    "an earlier one. Every path runs on the same random draws, so each life's "
+                    "luck is the same whichever way it goes.")
         all_names = list(scenarios)
-        dp1, dp2 = st.columns(2)
-        ia = next((i for i, n in enumerate(all_names) if scenarios[n][0].stem == "rd_engineer"), 0)
-        ib = next((i for i, n in enumerate(all_names)
-                   if scenarios[n][0].stem == "save_then_md_ep"), min(1, len(all_names) - 1))
-        dp_a = dp1.selectbox("Start on (A)", all_names, index=ia, key="dp_a")
-        dp_b = dp2.selectbox("Maybe switch to (B)", all_names, index=ib, key="dp_b",
-                             help="Pick a B whose changes start after the decision age, e.g. "
-                                  "'Industry first, then MD / EP' with a decision at 29.")
-        dp3, dp4, dp5 = st.columns(3)
-        dp_age = dp3.number_input("Decide at age", a0 + 1, a0 + base.horizon_years - 1,
-                                  min(a0 + 7, a0 + base.horizon_years - 1), key="dp_age")
-        dp_rule = dp4.selectbox("Switch if", list(DP_RULES), format_func=DP_RULES.get,
-                                key="dp_rule")
-        dp_th = dp5.number_input("Threshold ($)", 0.0, 5e6, 250_000.0, 25_000.0, key="dp_th",
-                                 disabled=dp_rule == "always")
-        if st.button("Run the decision point", type="primary"):
-            with st.spinner("Simulating A, B and the switch..."):
-                dp = dp_decide(shared(scenarios[dp_a][1]), shared(scenarios[dp_b][1]),
-                               int(dp_age - a0), dp_rule, float(dp_th))
-            st.session_state["dp_result"] = dp
-        dp = st.session_state.get("dp_result")
-        if dp is not None:
+        TP = PLAN.get("tree") or {}
+        TS = TP.get("steps") or []
+
+        def _name_idx(want, stem, fallback=0):
+            if want in all_names:
+                return all_names.index(want)
+            return next((i for i, n in enumerate(all_names) if scenarios[n][0].stem == stem),
+                        fallback)
+
+        tr_start = st.selectbox("Start on", all_names, key=wk("tr_start"),
+                                index=_name_idx(TP.get("start"), "rd_engineer"))
+        n_steps = st.number_input("Steps", 1, 4, int(len(TS) or 1), key=wk("tr_n"))
+        MEAS = list(DP_MEASURES)
+        steps_spec = []
+        for i in range(int(n_steps)):
+            d = TS[i] if i < len(TS) else {}
+            with st.container(border=True):
+                st.markdown(f"**Step {i + 1}**")
+                c1, c2, c3 = st.columns([1, 2, 2])
+                age_i = c1.number_input("At age", a0 + 1, a0 + base.horizon_years - 1,
+                                        int(d.get("age", min(a0 + 7 + 4 * i,
+                                                             a0 + base.horizon_years - 1))),
+                                        key=wk(f"tr_age{i}"))
+                to_i = c2.selectbox("Switch to", all_names, key=wk(f"tr_to{i}"),
+                                    help="From this age on, switching lives follow this path's "
+                                         "pay, costs and events. Pick one whose own changes "
+                                         "start at or after this age (e.g. 'Industry first, "
+                                         "then MD / EP' at 29); its earlier years are ignored.",
+                                    index=_name_idx(d.get("to"), "save_then_md_ep",
+                                                    min(1, len(all_names) - 1)))
+                applies = ["all"] + [f"{k}:{h}" for k in range(i) for h in ("switched", "stayed")]
+
+                def _ap_label(v):
+                    if v == "all":
+                        return "Every life"
+                    k, h = v.split(":")
+                    return f"Lives that {h} at step {int(k) + 1}"
+
+                ap_i = c3.selectbox("Applies to", applies, format_func=_ap_label,
+                                    key=wk(f"tr_ap{i}"),
+                                    index=_idx(applies, lambda v: v == d.get("applies", "all")))
+                # Events the lives could be following at this point.
+                ev_names = list(dict.fromkeys(
+                    e.name for n in [tr_start] + [s["to"] for s in steps_spec]
+                    for e in scenarios[n][1].events))
+                conds = d.get("conds") or [{"measure": "liquid", "value": 250_000.0}]
+                n_c = st.radio("Conditions", [1, 2], horizontal=True, key=wk(f"tr_nc{i}"),
+                               index=1 if len(conds) > 1 else 0,
+                               format_func=lambda v: "One" if v == 1 else "Two (both must hold)")
+                cspec = []
+                for j in range(int(n_c)):
+                    cd = conds[j] if j < len(conds) else {"measure": "always"}
+                    k1, k2, k3 = st.columns([2, 1, 2])
+                    m = k1.selectbox("Switch if" if j == 0 else "and", MEAS,
+                                     format_func=DP_MEASURES.get, key=wk(f"tr_m{i}_{j}"),
+                                     index=_idx(MEAS, lambda v: v == cd.get("measure")))
+                    c = {"measure": m}
+                    if m in ("liquid", "net_worth", "pay"):
+                        c["at_least"] = k2.selectbox(
+                            "Is", [True, False], key=wk(f"tr_op{i}_{j}"),
+                            format_func=lambda v: "at least" if v else "below",
+                            index=0 if cd.get("at_least", True) else 1)
+                        c["value"] = float(k3.number_input(
+                            "Amount ($)", 0.0, 1e8, float(cd.get("value", 250_000.0)), 10_000.0,
+                            key=wk(f"tr_v{i}_{j}")))
+                    elif m in ("event", "no_event"):
+                        if ev_names:
+                            c["event"] = k3.selectbox(
+                                "Event (by this age)", ev_names, key=wk(f"tr_e{i}_{j}"),
+                                index=_idx(ev_names, lambda v: v == cd.get("event")))
+                        else:
+                            k3.caption("These paths have no events.")
+                            c = {"measure": "always"}
+                    cspec.append(c)
+                steps_spec.append({"age": int(age_i), "to": to_i, "applies": ap_i,
+                                   "conds": cspec})
+        st.session_state["tree_spec"] = {"start": tr_start, "steps": steps_spec}
+
+        if st.button("Run the decision tree", type="primary"):
+            tsteps = []
+            for s in steps_spec:
+                ap = s["applies"]
+                if ap != "all":
+                    k, h = ap.split(":")
+                    ap = (int(k), h)
+                tsteps.append(DPStep(s["age"] - a0, shared(scenarios[s["to"]][1]),
+                                     [DPCondition(**c) for c in s["conds"]], ap))
+            with st.spinner("Simulating each step of the tree..."):
+                try:
+                    st.session_state["tree_result"] = dp_tree(shared(scenarios[tr_start][1]),
+                                                              tsteps)
+                except ValueError as exc:
+                    st.error(str(exc))
+        tree = st.session_state.get("tree_result")
+        if tree is not None:
             col = int(np.clip(65 - a0, 0, base.horizon_years))
-            st.metric("Paths that switch", f"{100 * dp.p_switch:.0f}%")
+            st.markdown("**Steps run:** " + "; ".join(
+                f"{k + 1}. at {a0 + s.year}, "
+                + ("" if s.applies_to == "all" else
+                   f"of lives that {s.applies_to[1]} at step {s.applies_to[0] + 1}, ")
+                + f"switch to {s.to.name} if " + " and ".join(c.label() for c in s.conditions)
+                + f" ({100 * tree.switched[k].mean():.0f}% of all lives)"
+                for k, s in enumerate(tree.steps)))
             rows = []
-            for lab, r_ in (("Stay on A", dp.a), ("Switch to B regardless", dp.b),
-                            ("Decide at the point", dp.combined)):
+            for lab, r_ in ((f"Always stay on {tree.start.scenario.name}", tree.start),
+                            ("Follow the tree", tree.combined)):
                 nw = r_.net_worth[:, col]
                 rows.append({"Plan": lab, "Median at 65": np.median(nw),
-                             "P10 at 65": np.percentile(nw, 10), "P90 at 65": np.percentile(nw, 90),
+                             "P10 at 65": np.percentile(nw, 10),
+                             "P90 at 65": np.percentile(nw, 90),
                              "Mean at 65": nw.mean(), "Cash crunch": r_.p_fail})
+            money_cols = {c: st.column_config.NumberColumn(format="$%,.0f")
+                          for c in ("Median at 65", "P10 at 65", "P90 at 65", "Mean at 65",
+                                    "Median", "P10", "P90", "Median gain vs staying")}
             st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", column_config={
-                **{c: st.column_config.NumberColumn(format="$%,.0f")
-                   for c in ("Median at 65", "P10 at 65", "P90 at 65", "Mean at 65")},
-                "Cash crunch": st.column_config.NumberColumn(format="percent")})
-            sw = dp.switch
-            if 0 < sw.mean() < 1:
-                gain = dp.combined.net_worth[:, col] - dp.a.net_worth[:, col]
-                st.caption(f"On the lives that switched, net worth at 65 vs staying on A: median "
-                           f"{money(float(np.median(gain[sw])))}. {dp.name}.")
-            else:
-                st.caption(dp.name + ".")
+                **money_cols, "Cash crunch": st.column_config.NumberColumn(format="percent")})
+
+            st.markdown("**Outcomes by route** (net worth at 65)")
+            br = dp_branches(tree, col)
+            st.dataframe(pd.DataFrame(br), hide_index=True, width="stretch", column_config={
+                **money_cols, "Share of lives": st.column_config.NumberColumn(format="percent"),
+                "Cash crunch": st.column_config.NumberColumn(format="percent"),
+                "Median gain vs staying": st.column_config.NumberColumn(
+                    format="$%,.0f", help="Median, over the lives on this route, of net worth "
+                                          "at 65 following the tree minus always staying.")})
+
+            # Tree diagram: one node per route prefix, sized by its share of lives.
+            P_ = len(tree.branch)
+            routes = [[] if b.startswith("Stayed on ") else b.split(" → ") for b in tree.branch]
+            nw65 = tree.combined.net_worth[:, col]
+            counts, ends = {}, {}
+            for p, r in enumerate(routes):
+                for d_ in range(len(r) + 1):
+                    counts[tuple(r[:d_])] = counts.get(tuple(r[:d_]), 0) + 1
+                ends.setdefault(tuple(r), []).append(nw65[p])
+
+            _ids = {pre: f"n{k}" for k, pre in enumerate(counts)}
+
+            def _nid(pre):
+                return _ids[pre]
+
+            lines = ['digraph{rankdir=TB; bgcolor="transparent"; '
+                     'node[shape=box style="rounded,filled" fillcolor="#eef3fb" color="#2a6fdb" '
+                     'fontname="Helvetica" fontsize=11]; edge[color="#8a94a6" fontsize=10 '
+                     'fontname="Helvetica"];']
+            for pre, n_ in counts.items():
+                head = (f"Start: {tree.start.scenario.name}" if not pre else pre[-1])
+                head = head.replace('"', "'")
+                lab = f"{head}\\n{100 * n_ / P_:.0f}% of lives"
+                if pre in ends:
+                    v = ends[pre]
+                    stay = "stay here" if pre else "never switch"
+                    lab += f"\\n{100 * len(v) / P_:.0f}% {stay}: median {money(float(np.median(v)))}"
+                lines.append(f'{_nid(pre)}[label="{lab}"];')
+                if pre:
+                    lines.append(f'{_nid(pre[:-1])}->{_nid(pre)}'
+                                 f'[label="{100 * n_ / counts[pre[:-1]]:.0f}%"];')
+            lines.append("}")
+            st.graphviz_chart("\n".join(lines), width="stretch")
+            st.caption("Each box is a point on a route; arrows show the share of the lives "
+                       "above that went that way. Medians are net worth at 65 for lives that "
+                       "end their route in that box.")
+
+            top = [r["Route"] for r in br[:6]]
+            qdf = pd.DataFrame([{"Route": b, **{f"p{q}": float(np.percentile(nw65[tree.branch == b], q))
+                                                for q in (10, 25, 50, 75, 90)}} for b in top])
+            ry = alt.Y("Route:N", title=None, sort=top, axis=alt.Axis(labelLimit=150))
+            fmt = alt.Axis(format="$,.2s")
+            whisk = alt.Chart(qdf).mark_rule(color="#8a94a6").encode(
+                y=ry, x=alt.X("p10:Q", title="Net worth at 65", axis=fmt), x2="p90:Q")
+            box = alt.Chart(qdf).mark_bar(size=18, opacity=0.85).encode(
+                y=ry, x="p25:Q", x2="p75:Q", color=alt.Color("Route:N", legend=None),
+                tooltip=["Route:N"] + [alt.Tooltip(f"p{q}:Q", format="$,.0f", title=f"P{q}")
+                                       for q in (10, 25, 50, 75, 90)])
+            med = alt.Chart(qdf).mark_tick(color="black", thickness=2, size=18).encode(
+                y=ry, x="p50:Q")
+            show_chart(alt.layer(whisk, box, med).properties(height=60 + 45 * len(top)),
+                       width="stretch")
+            st.caption("Boxes: middle half of lives on each route; whiskers 10th to 90th "
+                       "percentile. Routes are groups of lives sorted by what happened to "
+                       "them, so a weak route often holds the unlucky lives rather than a "
+                       "bad choice: compare 'Median gain vs staying' for the choice itself.")
 
 
 # ----------------------------------------------------------------------------
