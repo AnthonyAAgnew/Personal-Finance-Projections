@@ -14,6 +14,7 @@ reference and can save the edits as a small override file that ``extends`` it.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,6 +23,27 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import yaml
+
+
+def _fresh_engine() -> None:
+    """Re-import stats_projections when its source files change.
+
+    Streamlit reruns this script on every change but keeps imported modules,
+    so a redeploy that updates both the YAML files and the engine would
+    otherwise run new files against old code (Streamlit Cloud does this).
+    """
+    pkg = Path(__file__).resolve().parent / "stats_projections"
+    stamp = tuple(sorted((p.name, p.stat().st_mtime_ns) for p in pkg.glob("*.py")))
+    mod = sys.modules.get("stats_projections")
+    if mod is not None and getattr(mod, "_source_stamp", None) != stamp:
+        for name in [n for n in sys.modules if n.split(".")[0] == "stats_projections"]:
+            del sys.modules[name]
+        st.cache_resource.clear()
+    import stats_projections
+    stats_projections._source_stamp = stamp
+
+
+_fresh_engine()
 
 from stats_projections import ScenarioError, compare, load_scenario, simulate, summarize
 from stats_projections.config import career_info, compose, from_dict
