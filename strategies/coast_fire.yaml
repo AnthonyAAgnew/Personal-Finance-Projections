@@ -1,0 +1,16 @@
+name: Coast FIRE
+description: >
+  Once your portfolio would grow to 25x spending by 65 with no more saving,
+  switch to an easier job at half the pay and half the hours until 65.
+assumptions:
+  - "Coast number uses a 4.5% real return (7% nominal minus 2.5% inflation)."
+  - "After coasting: 50% of career pay and 50% of work hours until the planned retirement."
+strategy:
+  name: Coast FIRE
+  kind: coast
+  multiple: 25
+  min_year: 5             # start checking 3 years into the career
+  coast_factor: 0.5
+  expected_real_return: 0.045
+  target_year: 36
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

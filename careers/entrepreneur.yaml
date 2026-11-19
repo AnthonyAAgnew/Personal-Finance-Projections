@@ -1,0 +1,78 @@
+name: Med device entrepreneur
+description: >
+  Found a medical device startup right after the Ph.D. Lean grant-funded years,
+  then either raise venture money or go back to industry. Funded companies
+  are eventually acquired or shut down. Most of the upside is a rare exit.
+
+sources:
+  - "Kruze Consulting startup CEO salaries 2025: seed ~$147k, Series A ~$203k: https://kruzeconsulting.com/blog/post/startup-ceo-salary-report"
+  - "Citeline: VCs estimate 25-30% of device investments reach a successful exit: https://scrip.citeline.com/SC091507/Medtech-Venture-Capital-Heads-into-Unfamiliar-Terrain"
+  - "PitchBook Q4 2025 analyst note: medtech takes 10+ years from founding to exit: https://files.pitchbook.com/website/files/pdf/Q4_2025_PitchBook_Analyst_Note_The_Medtech_VC_Paradox_20372.pdf"
+  - "PMCF via MedDeviceGuide: median medtech M&A upfront value $171M in Q1 2026: https://meddeviceguide.com/blog/medtech-ma-market-analysis-h1-2026-deal-trends-strategic-shifts-guide"
+
+assumptions:
+  - "Years 1-2: about $50k from SBIR/STTR grants or a small pre-seed round (CHECK)."
+  - "40% chance of raising seed / Series A around age 34 (±1), then a founder salary of $150k. The other 60% return to industry R&D at $150k."
+  - "Funded companies resolve about 5 years later (±2): 30% acquired (the upper end of VC estimates, since the 25-30% is among funded deals) and 70% shut down."
+  - "Overall exit chance is therefore about 12%."
+  - "Founder proceeds at exit: median $5M before tax with a wide lognormal spread (spread 1.0, so the 10th-90th percentile is about $1.4M-$18M). This assumes ~5-10% founder ownership after dilution and preferences of a ~$100-200M sale. It is the weakest number here (CHECK)."
+  - "Exit proceeds taxed at a flat 20% (QSBS can remove the federal part, but California does not follow QSBS)."
+  - "After an exit or shutdown you take an industry role ($200k after an exit, $165k after a shutdown). No 401(k) match is modeled."
+
+income:
+  - name: Career pay
+    amount: 50000
+    start_year: 2
+    growth: {mean: 0.01, stdev: 0.03}
+    noise: 0.10
+    taxable: true
+
+# Hours per week: ~65 while founding, ~48 after returning to industry. CHECK
+time:
+  - {name: Work hours, amount: 65, start_year: 2, growth: {mean: -0.005, stdev: 0.02}}
+
+events:
+  - name: Raises venture funding
+    type: set_amount
+    target: Career pay
+    amount: 150000
+    year: 4
+    jitter: 1
+    group: funding
+    probability: 0.4
+  - name: Returns to industry (no funding)
+    type: set_amount
+    target: Career pay
+    amount: 150000
+    year: 4
+    jitter: 1
+    group: funding
+    probability: 0.6
+  - name: Company acquired
+    type: windfall
+    amount: 5000000
+    spread: 1.0
+    tax_rate: 0.20
+    same_time_as: Raises venture funding
+    offset: 5
+    jitter: 2
+    group: outcome
+    probability: 0.3
+  - name: Role after acquisition
+    type: set_amount
+    target: Career pay
+    amount: 200000
+    same_time_as: Company acquired
+  - name: Company shuts down
+    type: set_amount
+    target: Career pay
+    amount: 165000
+    same_time_as: Raises venture funding
+    offset: 5
+    jitter: 2
+    group: outcome
+    probability: 0.7
+  - {name: Hours after funding, type: set_amount, target: Work hours, amount: 60, same_time_as: Raises venture funding}
+  - {name: Hours back in industry, type: set_amount, target: Work hours, amount: 48, same_time_as: Returns to industry (no funding)}
+  - {name: Hours after acquisition, type: set_amount, target: Work hours, amount: 48, same_time_as: Company acquired}
+  - {name: Hours after shutdown, type: set_amount, target: Work hours, amount: 48, same_time_as: Company shuts down}

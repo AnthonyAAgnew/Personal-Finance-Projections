@@ -1,0 +1,22 @@
+name: One child
+description: >
+  One child born around age 34 (+-2): daycare for the first five years,
+  everyday costs to 18, then four years of college.
+
+sources:
+  - "Orange County infant center care is roughly $18k-$28k/yr across sources (state median $19,719 in 2022 per KidsData): https://w.kidsdata.org/export/pdf?cat=19"
+
+assumptions:
+  - "Daycare ~$2,000/month for ages 0-4 (Orange County range ~$18k-$28k/yr). CHECK"
+  - "Everyday costs ~$1,250/month to age 18 (food, clothes, activities, extra space, health). CHECK: the USDA cost-of-raising-a-child report was not found in search."
+  - "College ~$40k/yr for 4 years (roughly UC in-state cost of attendance), paid from savings. CHECK"
+
+expenses:
+  - {name: "Child 1: everyday", amount: 0}
+  - {name: "Child 1: daycare", amount: 0}
+  - {name: "Child 1: college", amount: 0}
+
+events:
+  - {name: Child 1 born, type: set_amount, target: "Child 1: everyday", amount: 15000, year: 5, jitter: 2, duration: 18}
+  - {name: "Child 1 daycare", type: set_amount, target: "Child 1: daycare", amount: 24000, same_time_as: Child 1 born, duration: 5}
+  - {name: "Child 1 college", type: set_amount, target: "Child 1: college", amount: 40000, same_time_as: Child 1 born, offset: 18, duration: 4}

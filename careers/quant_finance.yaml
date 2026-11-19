@@ -1,0 +1,31 @@
+name: Quantitative finance (quant researcher)
+description: >
+  Quant researcher at a hedge fund or trading firm (New York). Ph.D. +
+  statistics is the standard entry ticket. Very high, bonus-driven pay;
+  performance-based job risk; higher cost of living.
+
+sources:
+  - "Jane Street new-grad quant researcher base $300k; Citadel Securities PhD graduate $235k-$300k + bonus (TraderMath / job postings): https://www.tradermath.org/salaries/quant-researcher"
+  - "First-year total comp estimates ~$300k-$450k at top firms: https://www.tradermath.org/salaries/quant-compensation"
+
+assumptions:
+  - "Assumes you land the offer (top firms are very selective)."
+  - "First-year total ~$350k; senior quant researcher around age 37 (~$600k); 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 41. CHECK"
+  - "Bonuses swing pay +-30% a year; 8% yearly chance of being cut (half a year's pay lost)."
+  - "New York costs ~25% more than Irvine across the lifestyle budget, and rent ~60% more at the base budget. Taxes use the California table (NY state + NYC rates are similar at these incomes)."
+  - "~55 hours a week."
+
+income:
+  - {name: Career pay, amount: 350000, start_year: 2, growth: {mean: 0.01, stdev: 0.05}, noise: 0.30, loss_probability: 0.08, loss_fraction: 0.5, taxable: true}
+  - {name: Employer 401(k) match, amount: 12000, start_year: 2, end_year: 36, spendable: false}
+
+time:
+  - {name: Work hours, amount: 55, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+
+lifestyle:
+  cost_index: [[2, 1.25]]
+
+events:
+  - {name: New York rent, type: scale, target: Housing, factor: 1.6, year: 2}
+  - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, year: 6, jitter: 1}
+  - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, year: 10, jitter: 2, probability: 0.2}

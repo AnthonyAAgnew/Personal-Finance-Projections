@@ -1,0 +1,10 @@
+name: Fat FIRE
+description: >
+  Retire early but only with a big cushion: 33x yearly spending (a 3% draw),
+  keeping the full lifestyle tiers.
+strategy:
+  name: Fat FIRE
+  kind: fire
+  multiple: 33
+  min_year: 5             # start checking 3 years into the career
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

@@ -1,0 +1,36 @@
+name: Patent attorney (prosecution, IP firm)
+description: >
+  JD after the Ph.D., then patent prosecution (drafting and arguing patent
+  applications) at an IP firm. A technical Ph.D. is a big advantage here.
+  Steady, billable-hour work; partnership is possible but not certain.
+
+sources:
+  - "ABA Young Lawyers Division 2024 survey: median law school debt $112,500 (via Bankrate): https://bankrate.com/loans/student-loans/average-law-school-debt"
+  - "Private law school tuition averages about $49k-$53k/yr in 2025-26 (aggregators citing ABA data): https://www.bestcolleges.com/research/law-school-cost/"
+  - "LeanLaw citing AIPLA 2023 Economic Survey: median full-time IP attorney in private practice $270k; equity partners $420k: https://www.leanlaw.co/blog/compensation-models-for-intellectual-property-law-firms-why-your-pay-structure-might-be-your-biggest-competitive-liability/"
+
+assumptions:
+  - "Full-time JD in years 2-4 (ages 31-33) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
+  - "A 2L summer associate job pays ~$40k (CHECK)."
+  - "First-year prosecution associate at ~$200k (below the $225k BigLaw scale; IP boutiques often pay less). CHECK"
+  - "Senior associate / counsel around age 38 at ~$270k (AIPLA private-practice median)."
+  - "25% chance of equity partner around age 42 at ~$420k (AIPLA equity-partner median)."
+  - "~50 billable-driven hours a week."
+
+income:
+  - {name: Career pay, amount: 200000, start_year: 5, growth: {mean: 0.015, stdev: 0.03}, noise: 0.05, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
+  - {name: Summer associate, amount: 40000, start_year: 3, end_year: 4, taxable: true}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 5, end_year: 36, spendable: false}
+
+time:
+  - {name: Work hours, amount: 50, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+
+events:
+  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 2}
+  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 3}
+  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 4}
+  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 2}
+  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 3}
+  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 4}
+  - {name: Senior associate / counsel, type: set_amount, target: Career pay, amount: 270000, year: 9, jitter: 1}
+  - {name: Equity partner, type: set_amount, target: Career pay, amount: 420000, year: 13, jitter: 2, probability: 0.25}

@@ -1,0 +1,16 @@
+name: Lean FIRE
+description: >
+  Keep spending at the early-career budget for life (no lifestyle upgrades)
+  and stop working at 25x that spending.
+assumptions:
+  - "Lifestyle is capped at the first tier (Early career) no matter how much you earn."
+  - "Stops work at 25x yearly spending."
+lifestyle:
+  max_tier: 1
+  creep: 0.0
+strategy:
+  name: Lean FIRE
+  kind: fire
+  multiple: 25
+  min_year: 5             # start checking 3 years into the career
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

@@ -1,0 +1,21 @@
+extends: doctor.yaml
+name: Physician then industry CMO
+description: >
+  Medical school and residency as in the physician path, a few years of
+  practice, then a move into the medical device industry as medical director,
+  with a chance of becoming Chief Medical Officer.
+
+sources:
+  - "Getinge corporate medical officer posting: base $286k-$375k plus 50% annual bonus: https://www.career.com/job/getinge/corporate-medical-officer-us-or-eur-remote/j202603162002008212273"
+  - "Device CMO postings: base ~$200k-$450k plus bonus and equity (JRG Partners): https://www.jrgpartners.com/?p=33911"
+
+assumptions:
+  - "Around age 41 (about 3-5 years after residency), move to industry as a medical director at ~$330k total."
+  - "40% chance of becoming CMO around age 47 (+-2) at ~$520k total (base + bonus; equity not modeled). CHECK"
+  - "~50 hours a week as medical director, ~55 as CMO."
+
+events:
+  - {name: Moves to industry (medical director), type: set_amount, target: Career pay, amount: 330000, same_time_as: Admitted to med school, offset: 12}
+  - {name: Industry hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Moves to industry (medical director)}
+  - {name: Becomes CMO, type: set_amount, target: Career pay, amount: 520000, same_time_as: Moves to industry (medical director), offset: 6, jitter: 2, probability: 0.4}
+  - {name: CMO hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Becomes CMO}

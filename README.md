@@ -30,6 +30,61 @@ python -m streamlit run app.py
 - **Sensitivity:** a tornado chart for any option. Sidebar sliders change
   the market assumptions for every option at once.
 
+### Budget, lifestyle tiers, and milestones
+
+- **Category budget:** the profile lists expenses by category, in monthly
+  today's dollars (`monthly: 1400`).
+- **Lifestyle tiers:** `lifestyle.tiers` set a monthly budget per category
+  once your *affordable income* reaches a tier. Affordable income is your
+  3-year average take-home plus `withdrawal_rate` x your portfolio.
+- **Lifestyle creep:** between tiers you also spend `creep` of every extra
+  dollar.
+- **Paused categories:** an event that sets a category to 0 (for example,
+  med school covering living costs) keeps it at 0 even inside a tier.
+- **Milestones tab:**
+  - take-home milestones ($200k / $250k / $300k), with the gross pay each
+    needs;
+  - net worth milestones ($1M to $30M), with the perpetual dividend each
+    supports at the withdrawal rate.
+
+  Both show the chance of ever reaching the milestone and the median age.
+- **Cash flow tab:** a Sankey of one year's money, from income through
+  taxes and budget categories into savings.
+- **Employer matches** use `spendable: false`, so they go straight to
+  savings and are not take-home.
+
+### Life events, strategies, hours and debt
+
+- **Three ways to compare:**
+  - **Careers:** every career under one strategy.
+  - **Strategies:** one career under every strategy.
+  - **Life scenarios.**
+- **Life events (`life/`):**
+  - `partner.yaml`: a dual income with joint taxes (`data/taxes_ca_mfj.yaml`).
+  - `kids_1.yaml` and `kids_2.yaml`: daycare, everyday costs, and college.
+  - `expat_southern_europe.yaml`: remote US work from rural Italy or Spain.
+
+  Pick any combination; they are layered on every option.
+- **Finance strategies (`strategies/`):**
+  - Work to 65.
+  - Traditional FIRE: stop at 25x peak spending.
+  - Lean FIRE: capped lifestyle.
+  - Fat FIRE: 33x.
+  - Coast FIRE: half pay and half hours once you can coast to 25x by 65.
+  - Barista FIRE: 25% pay and hours.
+- **Hours:** each career has a `time:` schedule (hours per week) that events
+  and strategies change. The Hours tab shows hours by age, lifetime hours,
+  average hours per week by decade, and take-home per work hour.
+- **Debt:** loans are tracked as balances. Net worth = portfolio minus loans
+  owed. The scorecard shows peak loans and the age they're paid off.
+  `doctor.yaml` and `doctor_no_debt.yaml` compare medical school with and
+  without loans.
+- **From the command line:**
+
+  ```powershell
+  python -m stats_projections --profile profiles/my_profile.yaml "careers/*.yaml" --add life/partner.yaml --add strategies/coast_fire.yaml
+  ```
+
 ## Careers
 
 ```powershell
@@ -47,6 +102,19 @@ stipend, living costs, Social Security, and retirement age. Each file in
 | `device_sales.yaml` | Clinical specialist, then territory rep | MedReps survey coverage, commission swings |
 | `doctor.yaml` | MD after the Ph.D. | AAMC cost of attendance and debt, AAMC residency pay, Medscape 2026 |
 | `entrepreneur.yaml` | Med device founder | Kruze founder pay, VC exit rates, PitchBook and PMCF exit data |
+| `doctor_no_debt.yaml` | Physician with a full scholarship | Same as `doctor.yaml`, no loans |
+| `physician_cmo.yaml` | Physician, then industry medical director or CMO | Getinge and device CMO postings |
+| `physician_academic.yaml` | Academic medicine | Medscape minus an academic discount (CHECK) |
+| `patent_prosecution.yaml` | JD, then patent prosecution at an IP firm | ABA debt, AIPLA medians via LeanLaw |
+| `patent_litigation.yaml` | JD, then BigLaw patent litigation | 2025 Cravath scale |
+| `patent_inhouse.yaml` | JD, then in-house patent counsel (med device or pharma) | AIPLA via LeanLaw (CHECK) |
+| `postdoc_academia.yaml` | Postdoc, then a faculty job or industry | NIH NRSA FY2025 stipends |
+| `product_design.yaml` | Product design engineer | BLS mechanical engineers |
+| `data_analytics.yaml` | Data scientist or analytics | BLS OEWS (CHECK) |
+| `tech_ai_health.yaml` | Tech or AI health company | Typical big-tech levels (CHECK) |
+| `startup_employee.yaml` | Early-stage startup employee | Carta option pools |
+| `consumer_bootstrap.yaml` | Self-funded consumer product business | SBA and BLS survival rates |
+| `quant_finance.yaml` | Quant researcher (NYC) | Jane Street and Citadel postings, TraderMath |
 
 Each career file lists its **sources** and **assumptions**. Numbers marked
 CHECK are guesses: replace them with your own. To add a career, copy a file

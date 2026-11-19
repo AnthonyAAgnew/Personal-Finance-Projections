@@ -1,0 +1,22 @@
+# Buy a home around year 5. Overrides only what differs from the baseline.
+extends: baseline.yaml
+name: Buy a home
+description: Down payment around age 35, mortgage replaces rent, paid off 30 years later.
+
+events:
+  - name: Home down payment
+    type: purchase
+    amount: 90000
+    year: 5
+    jitter: 1                 # could slip a year either way
+  - name: Mortgage starts
+    type: set_amount
+    target: Housing
+    amount: 30000             # mortgage + tax + insurance + upkeep
+    same_time_as: Home down payment
+  - name: Mortgage paid off
+    type: set_amount
+    target: Housing
+    amount: 9000              # tax + insurance + upkeep only
+    same_time_as: Home down payment
+    offset: 30

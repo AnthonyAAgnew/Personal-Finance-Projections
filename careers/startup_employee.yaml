@@ -1,0 +1,24 @@
+name: Early-stage startup employee
+description: >
+  Join early-stage (seed / Series A) med device or health-tech startups as an
+  engineer, not a founder. Market salary, options that usually end up
+  worth little, more job churn.
+
+sources:
+  - "Carta: after Series A the median employee option pool is ~12% (founders ~56%): https://carta.com/data/linkedin-founder-vs-employee-ownership-over-time/"
+
+assumptions:
+  - "Salary ~$150k, a bit below big-company total pay. CHECK"
+  - "10% yearly chance the startup folds or you are cut (lose ~40% of that year's pay while job hunting)."
+  - "Equity, around age 39 (+-3): 10% chance of a modest payout (median $500k), 3% chance of a big one (median $3M); 87% nothing. Taxed at a flat 25%. CHECK: no public data on employee payout rates was found."
+  - "~55 hours a week."
+
+income:
+  - {name: Career pay, amount: 150000, start_year: 2, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.10, loss_fraction: 0.4, taxable: true}
+
+time:
+  - {name: Work hours, amount: 55, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+
+events:
+  - {name: Equity payout (modest exit), type: windfall, amount: 500000, spread: 1.0, tax_rate: 0.25, year: 10, jitter: 3, group: equity, probability: 0.10}
+  - {name: Equity payout (big exit), type: windfall, amount: 3000000, spread: 0.8, tax_rate: 0.25, year: 10, jitter: 3, group: equity, probability: 0.03}

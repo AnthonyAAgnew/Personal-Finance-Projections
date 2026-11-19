@@ -1,0 +1,64 @@
+# Baseline future. Every number here is a PLACEHOLDER: replace it with your own.
+# Money is in today's dollars (real). Year 0 is the first simulated year.
+# Streams are active for start_year <= year < end_year (end_year omitted = forever).
+# Income should be take-home pay (after tax); expenses are what you spend.
+# Whatever is left over each year is saved into the portfolio.
+
+name: Baseline
+description: Current job, renting, retire at 65.
+start_age: 30
+horizon_years: 65          # plan to age 95
+paths: 10000
+seed: 42                   # same seed + same paths = identical results
+failure_floor: 0           # "failure" = portfolio drops below this
+borrowing_rate: 0.05       # real interest charged while the balance is negative
+
+portfolio:
+  starting_balance: 40000
+  returns:
+    model: normal          # normal | student_t | bootstrap (needs a CSV, see README)
+    mean: 0.07             # nominal yearly return of the whole portfolio
+    stdev: 0.15
+  inflation:
+    mean: 0.025
+    stdev: 0.012
+    correlation: 0.0       # with nominal returns
+
+income:
+  - name: Salary
+    amount: 70000
+    growth: {mean: 0.015, stdev: 0.03}   # real raises, noisy year to year
+    loss_probability: 0.03               # 3% chance per year of a job gap
+    loss_fraction: 0.5                   # a gap costs half that year's pay
+  - name: Social Security
+    amount: 24000
+    start_year: 37                       # age 67
+
+expenses:
+  - name: Living
+    amount: 30000
+    growth: {mean: 0.005, stdev: 0.02}
+  - name: Housing
+    amount: 21600                        # rent
+    growth: {mean: 0.005, stdev: 0.01}
+  - name: Healthcare in retirement
+    amount: 8000
+    start_year: 35
+    growth: {mean: 0.02, stdev: 0.02}
+
+events:
+  - name: Retire
+    type: set_amount
+    target: Salary
+    amount: 0
+    year: 35                             # age 65
+  - name: Car
+    type: purchase
+    amount: 30000
+    year: 3
+    jitter: 1
+  - name: Second car
+    type: purchase
+    amount: 30000
+    same_time_as: Car
+    offset: 10

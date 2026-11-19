@@ -1,0 +1,16 @@
+name: Two children
+description: >
+  Two children: the first around age 34 (+-2), the second about three years
+  later. Same daycare, everyday and college costs for each.
+
+include: kids_1.yaml
+
+expenses:
+  - {name: "Child 2: everyday", amount: 0}
+  - {name: "Child 2: daycare", amount: 0}
+  - {name: "Child 2: college", amount: 0}
+
+events:
+  - {name: Child 2 born, type: set_amount, target: "Child 2: everyday", amount: 15000, same_time_as: Child 1 born, offset: 3, duration: 18}
+  - {name: "Child 2 daycare", type: set_amount, target: "Child 2: daycare", amount: 24000, same_time_as: Child 2 born, duration: 5}
+  - {name: "Child 2 college", type: set_amount, target: "Child 2: college", amount: 40000, same_time_as: Child 2 born, offset: 18, duration: 4}

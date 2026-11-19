@@ -1,0 +1,12 @@
+# Retire at 55 instead of 65. Only the Retire event changes.
+extends: baseline.yaml
+name: Retire at 55
+description: Same life, ten years less work.
+
+expenses:
+  - name: Healthcare in retirement
+    start_year: 25
+
+events:
+  - name: Retire
+    year: 25                  # age 55
