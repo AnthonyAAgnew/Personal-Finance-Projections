@@ -1,0 +1,32 @@
+name: Minneapolis (Medical Alley)
+description: >
+  Minneapolis-St. Paul, the densest medtech cluster in the US (Medtronic, Boston Scientific, Abbott, startups). Somewhat lower pay, much cheaper housing, Minnesota taxes.
+
+sources:
+  - "Minnesota DOR 2025 single brackets: 5.35% / 6.8% / 7.85% / 9.85%, standard deduction $14,950"
+
+assumptions:
+  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 2)."
+  - "Pay about 7% below Irvine (CHECK)."
+  - "Rent about 30% lower, other costs 8% lower; tiers cost 20% less (CHECK)."
+  - "Minnesota single brackets, and paid leave premium ~0.44% of wages from 2026 (CHECK). With a partner, MN joint brackets are wider; ignored, so taxes run a bit high."
+  - "Careers already tied to a place (FDA in Maryland, quant finance in New York) get this adjustment on top of their own; treat those combinations loosely."
+
+lifestyle:
+  cost_index: [[2, 0.8]]
+
+taxes:
+  - {name: California income tax, remove: true}
+  - {name: California SDI, remove: true}
+  - name: Minnesota income tax
+    deduction: 14950
+    brackets: [[0, 0.0535], [32570, 0.068], [106990, 0.0785], [198630, 0.0985]]
+  - name: Minnesota paid leave
+    per_earner: true
+    brackets: [[0, 0.0044], [176100, 0.0]]
+
+events:
+  - {name: Move to Minneapolis (Medical Alley), type: scale, target: Career pay, factor: 0.93, year: 2}
+  - {name: Moving costs, type: purchase, amount: 10000, same_time_as: Move to Minneapolis (Medical Alley)}
+  - {name: Rent there, type: scale, target: Housing, factor: 0.7, same_time_as: Move to Minneapolis (Medical Alley)}
+  - {name: Other costs there, type: scale, target: [Food, Transport, Health & insurance, Utilities & phone, Fun & dining, Travel, Shopping & other], factor: 0.92, same_time_as: Move to Minneapolis (Medical Alley)}

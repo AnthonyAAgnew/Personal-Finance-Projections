@@ -1,0 +1,33 @@
+name: Boston
+description: >
+  Boston / Cambridge biomedical and device cluster (Boston Scientific, Medtronic, hospitals). Similar pay, higher costs, Massachusetts taxes instead of California.
+
+sources:
+  - "BLS OEWS 17-2031: Boston-Cambridge-Nashua mean $108,070: https://www.bls.gov/OES/CURRENT/oes172031.htm"
+  - "Massachusetts DOR: 5% flat income tax plus 4% surtax above $1,083,150 (2025)"
+
+assumptions:
+  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 2)."
+  - "Pay about the same as Irvine (CHECK)."
+  - "Rent about 15% higher, other costs 5% higher; tiers cost 10% more (CHECK)."
+  - "Massachusetts 5% flat tax (4% extra above ~$1.08M), $4,400 exemption, PFML ~0.46% of wages up to the Social Security base (CHECK). With a partner the exemption should double; ignored."
+  - "Careers already tied to a place (FDA in Maryland, quant finance in New York) get this adjustment on top of their own; treat those combinations loosely."
+
+lifestyle:
+  cost_index: [[2, 1.1]]
+
+taxes:
+  - {name: California income tax, remove: true}
+  - {name: California SDI, remove: true}
+  - name: Massachusetts income tax
+    deduction: 4400
+    brackets: [[0, 0.05], [1083150, 0.09]]
+  - name: Massachusetts PFML
+    per_earner: true
+    brackets: [[0, 0.0046], [176100, 0.0]]
+
+events:
+  - {name: Move to Boston, type: scale, target: Career pay, factor: 1.0, year: 2}
+  - {name: Moving costs, type: purchase, amount: 10000, same_time_as: Move to Boston}
+  - {name: Rent there, type: scale, target: Housing, factor: 1.15, same_time_as: Move to Boston}
+  - {name: Other costs there, type: scale, target: [Food, Transport, Health & insurance, Utilities & phone, Fun & dining, Travel, Shopping & other], factor: 1.05, same_time_as: Move to Boston}
