@@ -105,6 +105,17 @@ def file_name(f: Path) -> str:
         return f.stem
 
 
+def show_chart(chart, **kwargs):
+    """Render an Altair chart with its legend underneath, so phones keep the full width."""
+    chart = chart.configure_legend(orient="bottom", direction="vertical", columns=1,
+                                   symbolOpacity=1, symbolStrokeWidth=3,
+                                   labelLimit=220, title=None)
+    # Fit the width to the screen but keep the plot's own height; the legend
+    # below then adds to the height instead of squashing the plot.
+    chart = chart.properties(autosize=alt.AutoSizeParams(type="fit-x", contains="padding"))
+    st.altair_chart(chart, **kwargs)
+
+
 def money(x: float) -> str:
     sign, x = ("-" if x < 0 else ""), abs(x)
     if x >= 1e6:
@@ -496,6 +507,37 @@ with tab_results:
     )
 
     if profile_file:
+        st.subheader("At a glance")
+        g_name = st.selectbox("Option", [r.scenario.name for r in results], key="glance")
+        g = next(r for r in results if r.scenario.name == g_name)
+        g_a0 = g.scenario.start_age or 0
+        g65 = min(65 - g_a0, g.scenario.horizon_years)
+        g_inc = income_milestones(g, (200_000,))[0]
+        g_nw = net_worth_milestones(g, (1e6,))[0]
+        g_h, g_d, g_s = hours_metrics(g), debt_metrics(g), strategy_metrics(g)
+
+        def _ms(m):
+            return ("never" if not m.p_ever else
+                    f"{100 * m.p_ever:.0f}% · age {m.median_age:.0f}")
+
+        c1, c2 = st.columns(2)
+        c1.metric("Net worth at 65 (median)", money(float(np.median(g.net_worth[:, g65]))),
+                  help="Portfolio minus loans owed, today's dollars.")
+        c2.metric("$200k take-home reached", _ms(g_inc),
+                  help="Chance, and median age among paths that get there.")
+        c3, c4 = st.columns(2)
+        c3.metric("$1M net worth reached", _ms(g_nw))
+        if g_s is not None:
+            c4.metric(f"{g_s['strategy']} kicks in",
+                      f"{100 * g_s['p_hit']:.0f}% · age {g_s['median_age']:.0f}"
+                      if g_s["median_age"] else "never")
+        elif g_h is not None:
+            c4.metric("Take-home per work hour", money(g_h.take_home_per_hour),
+                      help=f"Lifetime median: {g_h.lifetime_hours:,.0f} work hours.")
+        if g_d is not None:
+            st.caption(f"Loans: {100 * g_d.p_borrow:.0f}% of paths borrow, median peak "
+                       f"{money(g_d.peak_median)}, paid off around age {g_d.debt_free_age:.0f}.")
+
         st.subheader("Scorecard")
         st.caption("Net worth = portfolio minus loans still owed (student loans count). "
                    + (f"Life events: {', '.join(file_name(f) for f in life_files)}. "
@@ -549,10 +591,10 @@ with tab_results:
 
         debt_res = [r for r in results if r.debt is not None and r.debt.any()]
         if debt_res:
-            st.subheader("Loans owed by age (average across paths)")
+            st.subheader("Loans owed by age")
             dd = pd.concat([pd.DataFrame({"x": ages(r), "scenario": r.scenario.name,
                                           "owed": r.debt.mean(axis=0)}) for r in debt_res])
-            st.altair_chart(
+            show_chart(
                 alt.Chart(dd).mark_line(strokeWidth=2.5).encode(
                     x=alt.X("x:Q", title=x_title),
                     y=alt.Y("owed:Q", title="Owed ($, today's)", axis=alt.Axis(format="$,.2s")),
@@ -583,13 +625,14 @@ with tab_results:
                       "p90": sm.bands[90]})
         for res in results
     ])
-    st.subheader("Median net worth with P10 to P90 band (portfolio minus loans owed)")
+    st.subheader("Net worth by age")
+    st.caption("Median line, shaded P10 to P90. Net worth = portfolio minus loans owed.")
     show = st.multiselect("Bands to shade", [r.scenario.name for r in results],
                           default=[results[0].scenario.name] + ([WHAT_IF] if what_if else []))
     area = alt.Chart(bands[bands.scenario.isin(show)]).mark_area(opacity=0.15).encode(
         x=alt.X("x:Q", title=x_title),
         y=alt.Y("p10:Q", title="Net worth (today's $)", axis=alt.Axis(format="$,.2s")),
-        y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, legend=None),
+        y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
     )
     line = alt.Chart(bands).mark_line(strokeWidth=2.5).encode(
         x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
@@ -599,15 +642,14 @@ with tab_results:
                  alt.Tooltip("p90:Q", format="$,.0f", title="P90")],
     )
     zero = alt.Chart(pd.DataFrame({"y": [floor]})).mark_rule(color="gray").encode(y="y:Q")
-    st.altair_chart((area + line + zero).properties(height=420).interactive(bind_y=False),
+    show_chart((area + line + zero).properties(height=420).interactive(bind_y=False),
                     use_container_width=True)
 
     if any(r.income is not None and r.income.any() for r in results):
         basis = st.radio("Income shown", ["Take-home (after tax)", "Gross (before tax)"],
                          horizontal=True)
         take = basis.startswith("Take")
-        st.subheader(f"{'Take-home' if take else 'Gross'} income by age "
-                     "(median, shaded P10 to P90)")
+        st.subheader(f"{'Take-home' if take else 'Gross'} income by age")
         series = {res.scenario.name: (res.take_home if take else res.income) for res in results}
         inc = pd.concat([
             pd.DataFrame({"x": ages(res)[:-1], "scenario": res.scenario.name,
@@ -620,7 +662,7 @@ with tab_results:
         inc_area = alt.Chart(inc[inc.scenario.isin(show)]).mark_area(opacity=0.15).encode(
             x=alt.X("x:Q", title=x_title),
             y=alt.Y("p10:Q", title="Income ($/yr, today's $)", axis=alt.Axis(format="$,.2s")),
-            y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, legend=None))
+            y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, title=None))
         inc_line = alt.Chart(inc).mark_line(strokeWidth=2.5).encode(
             x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
             tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
@@ -636,7 +678,7 @@ with tab_results:
             layers.append(alt.Chart(marks).mark_text(align="left", dx=4, dy=-6, color="gray",
                                                      fontSize=11).encode(
                 y="y:Q", text="label:N", x=alt.value(0)))
-        st.altair_chart(alt.layer(*layers).properties(height=320), use_container_width=True)
+        show_chart(alt.layer(*layers).properties(height=320), use_container_width=True)
         st.caption("Dashed lines mark the take-home milestones (see the Milestones tab). Mean (in "
                    "the tooltip) can sit far above the median for careers with rare big outcomes.")
 
@@ -645,8 +687,8 @@ with tab_results:
                       "failed": summarize(res).cumulative_failure})
         for res in results
     ])
-    st.subheader("Share of paths that have dropped below the floor by each age")
-    st.altair_chart(
+    st.subheader("Share of paths below the floor")
+    show_chart(
         alt.Chart(fail).mark_line(strokeWidth=2.5).encode(
             x=alt.X("x:Q", title=x_title),
             y=alt.Y("failed:Q", title="Failed by now", axis=alt.Axis(format="%")),
@@ -731,7 +773,7 @@ with tabs["Milestones"]:
     st.caption(f"The bracket is the perpetual dividend: what that portfolio could pay you every "
                f"year at {100 * wr:.2f}% if you stopped working, before tax, in today's dollars.")
 
-    st.subheader("Chance of having reached a milestone by each age")
+    st.subheader("Reached by each age")
     options = ([f"Take-home {money(v)}" for v in sorted(inc_levels)]
                + [f"Net worth {money(v)}" for v in NET_WORTH_MILESTONES])
     pick = st.selectbox("Milestone", options, index=min(len(inc_levels), len(options) - 1))
@@ -741,7 +783,7 @@ with tabs["Milestones"]:
         m = next(m for m in ms if pick.endswith(money(m.level)))
         x = ages(res)[:-1] if pick.startswith("Take") else ages(res)[1:]
         rows.append(pd.DataFrame({"x": x, "scenario": res.scenario.name, "p": m.by_age}))
-    st.altair_chart(
+    show_chart(
         alt.Chart(pd.concat(rows)).mark_line(strokeWidth=2.5).encode(
             x=alt.X("x:Q", title=x_title),
             y=alt.Y("p:Q", title="Reached by now", axis=alt.Axis(format="%"),
@@ -786,8 +828,8 @@ with tabs["Lifestyle"]:
         shares = tier_shares(res)
         tiers_df = pd.concat([pd.DataFrame({"x": ages(res)[:-1], "tier": n, "share": v})
                               for n, v in shares.items()])
-        st.subheader(f"{pick_ls}: share of paths living at each tier")
-        st.altair_chart(
+        st.subheader("Lifestyle tier by age")
+        show_chart(
             alt.Chart(tiers_df).mark_area().encode(
                 x=alt.X("x:Q", title=x_title),
                 y=alt.Y("share:Q", stack="normalize", title="Share of paths",
@@ -804,11 +846,11 @@ with tabs["Lifestyle"]:
             use_container_width=True,
         )
 
-        st.subheader("Typical yearly spending by category (average across paths)")
+        st.subheader("Yearly spending by category")
         spend = res.flow_means["spending"]
         sp = pd.concat([pd.DataFrame({"x": ages(res)[:-1], "category": c, "amount": v})
                         for c, v in spend.items() if v.any()])
-        st.altair_chart(
+        show_chart(
             alt.Chart(sp).mark_area().encode(
                 x=alt.X("x:Q", title=x_title),
                 y=alt.Y("amount:Q", stack=True, title="$/yr (today's $)",
@@ -855,12 +897,12 @@ with tabs["Hours"]:
                           "p90": np.percentile(r.hours, 90, axis=0),
                           "mean": r.hours.mean(axis=0)})
             for r in hour_res])
-        st.subheader("Hours per week by age (median line, mean in tooltip)")
+        st.subheader("Hours per week by age")
         show_h = st.multiselect("Bands to shade", [r.scenario.name for r in hour_res],
                                 default=[hour_res[0].scenario.name], key="hours_bands")
         band = alt.Chart(hrs[hrs.scenario.isin(show_h)]).mark_area(opacity=0.15).encode(
             x=alt.X("x:Q", title=x_title), y=alt.Y("p10:Q", title="Hours / week"), y2="p90:Q",
-            color=alt.Color("scenario:N", scale=color_scale, legend=None))
+            color=alt.Color("scenario:N", scale=color_scale, title=None))
         line = alt.Chart(hrs).mark_line(strokeWidth=2.5, interpolate="step-after").encode(
             x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
             tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
@@ -868,7 +910,7 @@ with tabs["Hours"]:
                      alt.Tooltip("mean:Q", format=".1f", title="Mean h/wk")])
         ref = alt.Chart(pd.DataFrame({"y": [40]})).mark_rule(strokeDash=[4, 4], color="gray"
                                                               ).encode(y="y:Q")
-        st.altair_chart(alt.layer(band, line, ref).properties(height=320), use_container_width=True)
+        show_chart(alt.layer(band, line, ref).properties(height=320), use_container_width=True)
         st.caption("Dashed line: a 40-hour week. Options with uncertain paths (admission, "
                    "tenure, partnership) mix outcomes in the median; the shaded band shows the spread.")
 
@@ -912,75 +954,105 @@ with tabs["Cash flow"]:
     t = age_cf - a
     fm = res.flow_means
 
+    detail = st.radio("Detail", ["Summary", "Full"], horizontal=True, key="cf_detail",
+                      help="Summary groups taxes and spending so the chart reads on a phone.")
+    summary = detail == "Summary"
+
     def val(d, k):
         return float(d[k][t])
 
-    nodes, links = [], []
+    ESSENTIALS = {"Housing", "Food", "Transport", "Health & insurance", "Utilities & phone",
+                  "Healthcare in retirement"}
+    tax_names = set(fm["tax"])
 
-    def node(name):
-        if name not in nodes:
-            nodes.append(name)
-        return nodes.index(name)
+    def group(name: str) -> str:
+        if not summary:
+            return name
+        if name in tax_names:
+            return "Taxes"
+        if name in ESSENTIALS:
+            return "Essentials"
+        if name.startswith("Child"):
+            return "Kids"
+        if name.startswith("Partner"):
+            return "Partner"
+        if name in ("One-time purchases", "Loan payments", "Saved", "From savings",
+                    "Total income", "Take-home", "Windfalls (after tax)", "Loans received"):
+            return name
+        return "Lifestyle"
+
+    flows_: dict[tuple[str, str], float] = {}
+
+    def link(src: str, dst: str, v: float) -> None:
+        if v > 1:
+            key = (group(src) if src not in incomes else src, group(dst))
+            flows_[key] = flows_.get(key, 0.0) + v
 
     gross, take = "Total income", "Take-home"
     incomes = {k: val(fm["income"], k) for k in fm["income"]}
     spendable = {s.name: s.spendable for s in res.scenario.income}
     for k, v in incomes.items():
-        if v > 1:
-            links.append((node(k), node(gross), v))
+        link(k, gross, v)
+    tax_total = sum(val(fm["tax"], k) for k in fm["tax"])
     for k in fm["tax"]:
-        v = val(fm["tax"], k)
-        if v > 1:
-            links.append((node(gross), node(k), v))
+        link(gross, k, val(fm["tax"], k))
     nonspend = sum(v for k, v in incomes.items() if not spendable.get(k, True))
-    take_total = sum(incomes.values()) - sum(val(fm["tax"], k) for k in fm["tax"]) - nonspend
-    if take_total > 1:
-        links.append((node(gross), node(take), take_total))
+    link(gross, take, sum(incomes.values()) - tax_total - nonspend)
     other = {k: val(fm["other"], k) for k in fm["other"]}
     for k in ("Windfalls (after tax)", "Loans received"):
-        if other[k] > 1:
-            links.append((node(k), node(take), other[k]))
+        link(k, take, other[k])
     spend_total = 0.0
     for k in fm["spending"]:
         v = val(fm["spending"], k)
-        if v > 1:
-            links.append((node(take), node(k), v))
-            spend_total += v
+        link(take, k, v)
+        spend_total += max(v, 0.0)
     for k in ("One-time purchases", "Loan payments"):
-        if other[k] > 1:
-            links.append((node(take), node(k), other[k]))
+        link(take, k, other[k])
     saved = float(fm["saved"][t]) - nonspend
-    if saved > 1:
-        links.append((node(take), node("Saved"), saved))
-    elif saved < -1:
-        links.append((node("From savings"), node(take), -saved))
-    if nonspend > 1:
-        links.append((node(gross), node("Saved"), nonspend))
+    if saved > 0:
+        link(take, "Saved", saved)
+    else:
+        link("From savings", take, -saved)
+    link(gross, "Saved", nonspend)
 
-    palette = {"Saved": "#2e9e6a", "From savings": "#c9474f", take: "#2a6fdb", gross: "#6b7a8f"}
-    tax_names = set(fm["tax"])
+    nodes: list[str] = []
+    for s_, d_ in flows_:
+        for n in (s_, d_):
+            if n not in nodes:
+                nodes.append(n)
+    idx = {n: i for i, n in enumerate(nodes)}
+    total_of = {n: max(sum(v for (s_, d_), v in flows_.items() if d_ == n),
+                       sum(v for (s_, d_), v in flows_.items() if s_ == n)) for n in nodes}
+    palette = {"Saved": "#2e9e6a", "From savings": "#c9474f", take: "#2a6fdb", gross: "#6b7a8f",
+               "Taxes": "#e07b39"}
     colors = [palette.get(n, "#e07b39" if n in tax_names else "#9cc3e6") for n in nodes]
     fig = go.Figure(go.Sankey(
         arrangement="snap",
-        node=dict(label=[f"{n}  {money(sum(v for s_, d_, v in links if d_ == i) or sum(v for s_, d_, v in links if s_ == i))}"
-                         for i, n in enumerate(nodes)],
-                  color=colors, pad=14, thickness=16),
-        link=dict(source=[s_ for s_, _, _ in links], target=[d_ for _, d_, _ in links],
-                  value=[v for _, _, v in links],
+        node=dict(label=[f"{n} {money(total_of[n])}" for n in nodes],
+                  color=colors, pad=18 if summary else 12, thickness=16),
+        link=dict(source=[idx[s_] for s_, _ in flows_], target=[idx[d_] for _, d_ in flows_],
+                  value=list(flows_.values()),
                   hovertemplate="%{source.label} → %{target.label}: $%{value:,.0f}<extra></extra>"),
     ))
-    fig.update_layout(height=520, margin=dict(l=10, r=10, t=10, b=10), font=dict(size=12))
-    st.subheader(f"{pick_cf} at {x_title.lower()} {age_cf}: where a year's money goes "
-                 "(average across paths, today's $)")
+    fig.update_layout(height=420 if summary else 560, margin=dict(l=4, r=4, t=4, b=4),
+                      font=dict(size=12))
+    st.subheader(f"Where a year's money goes at {age_cf}")
+    st.caption(f"{pick_cf}, average across paths, today's dollars.")
     st.plotly_chart(fig, use_container_width=True)
+
     income_total = sum(incomes.values())
     if income_total > 0:
-        rate = (max(saved, 0) + nonspend) / income_total
-        st.caption(f"Total income {money(income_total)} · taxes "
-                   f"{money(sum(val(fm['tax'], k) for k in fm['tax']))} · spending "
-                   f"{money(spend_total)} · saved {money(max(saved, 0) + nonspend)} "
-                   f"(savings rate {100 * rate:.0f}% of gross). Averages across paths can mix "
-                   "outcomes, such as admitted and not-admitted paths for the physician.")
+        kept = max(saved, 0) + nonspend
+        st.dataframe(pd.DataFrame([
+            {"": "Total income", "$/yr": income_total, "Share": 1.0},
+            {"": "Taxes", "$/yr": tax_total, "Share": tax_total / income_total},
+            {"": "Spending", "$/yr": spend_total, "Share": spend_total / income_total},
+            {"": "Saved (incl. employer match)", "$/yr": kept, "Share": kept / income_total},
+        ]), hide_index=True, use_container_width=True, column_config={
+            "$/yr": st.column_config.NumberColumn(format="$%,.0f"),
+            "Share": st.column_config.NumberColumn(format="percent")})
+        st.caption("Averages across paths can mix outcomes, such as admitted and not-admitted "
+                   "paths for the physician.")
 
 
 # ----------------------------------------------------------------------------
@@ -1060,7 +1132,7 @@ with tab_sens:
         )
         rule = alt.Chart(pd.DataFrame({"x": [base_p]})).mark_rule(color="black").encode(x="x:Q")
         st.subheader(f"What moves the failure rate (base {100 * base_p:.1f}%)")
-        st.altair_chart((chart + rule).properties(height=26 * len(rows) + 40),
+        show_chart((chart + rule).properties(height=26 * len(rows) + 40),
                         use_container_width=True)
         st.dataframe(pd.DataFrame([{
             "Input": r.knob.label, "Low": r.knob.low_desc, "P(fail) low": f"{100 * r.p_low:.1f}%",
