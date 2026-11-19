@@ -93,10 +93,15 @@ python -m streamlit run app.py
 - **Financial-independence age** compares the portfolio with 25x the budget
   your pay sets (not spending the portfolio itself funds), so it no longer
   drifts out of reach as wealth grows.
-- **Decision points** (Decide tab): start on path A and, at a chosen age,
-  switch to path B on the simulated lives that meet a rule (liquid savings or
-  net worth above a threshold). Shows the share that switch and how the mixed
-  plan compares with always A or always B (`stats_projections/decisions.py`).
+- **Decision trees** (Decide tab): start on one path and add up to four
+  steps. Each step picks an age, a path to switch to, which lives it applies to
+  (every life, or only those that switched or stayed at an earlier step) and up
+  to two conditions that must all hold: liquid savings, net worth or last
+  year's career pay above or below an amount, or an event (such as "Top-firm
+  offer") having or not having happened by that age. Shows the share of lives
+  on each route, outcomes at 65 by route, a tree diagram and the gain versus
+  never switching. Trees are saved with a plan
+  (`stats_projections/decisions.py`).
 - **Break-even finder** (Sensitivity tab): solves for the value of one input of
   option A (EP pay, exit price, tuition) that makes it match option B.
 - **Free time** (Hours tab): waking hours left after work and commuting.
