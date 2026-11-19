@@ -69,7 +69,24 @@ LOCATION_DIR = ROOT / "locations"
 STRATEGY_DIR = ROOT / "strategies"
 WHAT_IF = "What if"
 
-st.set_page_config(page_title="STATS Projections", page_icon="📈", layout="wide")
+st.set_page_config(page_title="STATS Projections", page_icon="📈", layout="wide",
+                   initial_sidebar_state="collapsed")
+
+# Phone layout: tighter margins, smaller headings and tabs that scroll sideways.
+st.markdown("""<style>
+@media (max-width: 640px) {
+  .block-container {padding: 2.5rem 0.75rem 3rem !important;}
+  h1 {font-size: 1.6rem !important;}
+  h2 {font-size: 1.3rem !important;}
+  h3 {font-size: 1.1rem !important;}
+  [data-testid="stMetricValue"] {font-size: 1.35rem;}
+  [data-testid="stTabs"] [data-baseweb="tab-list"] {gap: 0.4rem; overflow-x: auto;
+      scrollbar-width: none;}
+  [data-testid="stTabs"] button[role="tab"] {padding: 0.2rem 0.35rem; white-space: nowrap;}
+  [data-testid="stTabs"] button[role="tab"] p {font-size: 0.92rem;}
+  [data-testid="stExpander"] summary p {font-size: 1rem;}
+}
+</style>""", unsafe_allow_html=True)
 
 
 # ----------------------------------------------------------------------------
@@ -123,7 +140,7 @@ def load_all(mode: str, profile: Path | None = None, life=(), strategy: Path | N
         except ScenarioError as exc:
             errors.append(f"{f.name}: {exc}")
     for e in errors:
-        st.sidebar.error(e)
+        st.error(e)
     return out
 
 
@@ -158,13 +175,20 @@ def money(x: float) -> str:
 
 CORE_CAREERS = ("rd_engineer", "regulator", "device_sales", "doctor", "cardiology_ep", "entrepreneur")
 
-with st.sidebar:
-    st.title("STATS Projections")
+st.title("STATS Projections")
+summary_slot = st.empty()
+setup = st.expander("⚙️ Setup: what to compare", expanded=False)
+sim = st.expander("🎲 Simulation settings", expanded=False)
+with setup:
+    setup_left, setup_right = st.columns(2)
+
+with setup_left:
     mode = st.radio("Compare", ["Careers", "Strategies", "Life scenarios"], horizontal=True,
                     help="Careers: your profile under each career path. Strategies: one career "
                          "under each finance strategy (FIRE, coast...). Life scenarios: the "
                          "standalone files in scenarios/.")
     profile_file, life_files, strategy_file, career_file = None, [], None, None
+    location_file = None
     if mode != "Life scenarios":
         profiles = sorted(PROFILE_DIR.glob("*.yaml"))
         if not profiles:
@@ -205,7 +229,7 @@ names = list(scenarios)
 ref_key = {"Careers": "rd_engineer", "Strategies": "work_to_65"}.get(mode, "baseline")
 default_base = next((n for n, (f, _) in scenarios.items() if f.stem == ref_key), names[0])
 
-with st.sidebar:
+with setup_right:
     label = {"Careers": "Reference career", "Strategies": "Reference strategy"}.get(mode, "Baseline")
     base_name = st.selectbox(label, names, index=names.index(default_base))
     others = [n for n in names if n != base_name]
@@ -219,7 +243,8 @@ with st.sidebar:
     base_file, base = scenarios[base_name]
     save_dir = {"Careers": CAREER_DIR, "Life scenarios": SCENARIO_DIR}.get(mode)
 
-    st.subheader("Shared assumptions")
+
+with sim:
     st.caption("Applied to every option, so comparisons stay fair.")
     paths = st.select_slider("Paths", [1000, 2000, 5000, 10000, 20000, 50000], value=base.paths)
     seed = st.number_input("Random seed", value=base.seed, step=1)
@@ -263,6 +288,22 @@ with st.sidebar:
     stress = stress_options[stress_name]
 
 
+loc_label = "Irvine" if not location_file else file_name(location_file)
+summary_bits = [f"**{base_name}** vs {len(chosen)} other{'s' if len(chosen) != 1 else ''}"]
+if mode != "Life scenarios":
+    summary_bits.append(loc_label)
+    if strategy_file is not None:
+        summary_bits.append(file_name(strategy_file))
+    elif career_file is not None:
+        summary_bits.append(file_name(career_file))
+    if life_files:
+        extra = [f for f in life_files if f != location_file]
+        if extra:
+            summary_bits.append(", ".join(file_name(f) for f in extra))
+summary_bits += [f"{int(paths):,} paths", stress_name]
+summary_slot.caption(f"{mode}: " + " · ".join(summary_bits))
+
+
 def shared(s):
     return replace(s, paths=int(paths), seed=int(seed), failure_floor=float(floor),
                    returns=returns, inflation=inflation, stress=stress or s.stress)
@@ -277,7 +318,20 @@ tab_names = ["Results", "Milestones", "Lifestyle", "Hours", "Cash flow", "What i
 if profile_file:
     tab_names.insert(5, "Assumptions")
     tab_names.insert(1, "Decide")
-tabs = dict(zip(tab_names, st.tabs(tab_names)))
+TAB_GROUPS = {
+    "Overview": ["Results", "Milestones"],
+    "Compare": ["Decide", "Sensitivity"],
+    "Plan": ["What if", "Lifestyle", "Hours", "Cash flow"],
+    "Details": ["Assumptions", "Files"],
+}
+tabs = {}
+for group, top in zip(TAB_GROUPS, st.tabs(list(TAB_GROUPS))):
+    subs = [n for n in TAB_GROUPS[group] if n in tab_names]
+    with top:
+        if len(subs) == 1:
+            tabs[subs[0]] = st.container()
+        else:
+            tabs.update(zip(subs, st.tabs(subs)))
 tab_results, tab_edit, tab_sens, tab_files = (
     tabs["Results"], tabs["What if"], tabs["Sensitivity"], tabs["Files"])
 
