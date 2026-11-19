@@ -10,6 +10,7 @@ sources:
   - "Burnout and satisfaction: Jellyfish 2024 State of Engineering Management (604 respondents): 65% burned out in the past year (85% on teams under 10), 46% of engineers say their team is burned out, 75% find their work rewarding: https://jellyfish.co/blog/2024-state-of-engineering-management-report/"
 
 assumptions:
+  - "Hiring odds (CHECK): a 50% chance of a big-tech or AI health offer at ~$230k. Otherwise a data science role in medtech at ~$150k, reaching staff (~$185k) about 5 years in, as in the data science path."
   - "Total comp ~$230k at entry (base + bonus + RSUs), rising to ~$320k at senior/staff around age 32; 25% reach principal/director (~$450k) around age 37. CHECK: typical big-tech levels, no source found in search."
   - "Stock makes pay swing +-15% a year; 6% yearly layoff risk."
   - "Hours: 45/week (EMI's 45-hour average; big-tech norms are similar, CHECK)."
@@ -23,8 +24,11 @@ time:
   - {name: Work hours, amount: 45, start_year: 4}
 
 events:
-  - {name: Senior / staff scientist, type: set_amount, target: Career pay, amount: 320000, year: 8, jitter: 1, confidence: medium}
-  - {name: Principal / director, type: set_amount, target: Career pay, amount: 450000, year: 13, jitter: 2, probability: 0.25, confidence: low}
+  - {name: Big-tech or AI offer, type: set_amount, target: Career pay, amount: 230000, year: 4, group: hire, probability: 0.5, confidence: medium}
+  - {name: Medtech data science instead, type: set_amount, target: Career pay, amount: 150000, year: 4, group: hire, probability: 0.5, confidence: medium}
+  - {name: Senior / staff scientist, type: set_amount, target: Career pay, amount: 320000, same_time_as: Big-tech or AI offer, offset: 4, jitter: 1, confidence: medium}
+  - {name: Principal / director, type: set_amount, target: Career pay, amount: 450000, same_time_as: Big-tech or AI offer, offset: 9, jitter: 2, probability: 0.25, confidence: low}
+  - {name: Staff data scientist (medtech), type: set_amount, target: Career pay, amount: 185000, same_time_as: Medtech data science instead, offset: 5, jitter: 1, confidence: medium}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 82, satisfaction: 0.75, burnout: 0.65}

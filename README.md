@@ -85,6 +85,14 @@ python -m streamlit run app.py
   then Roth and HSA. The Results tab shows each account and an after-tax net
   worth at the chosen age. Not modeled: required minimum distributions, Roth
   conversions, Social Security taxation.
+- **Social Security from your earnings** (`social_security:` in the profile):
+  the benefit at 67 comes from your 35 best years of capped wages and the SSA
+  formula, so long training or early retirement lowers it.
+- **Hiring odds:** quant (30% top-firm offer), tech/AI (50%) and BigLaw (60%)
+  now include the chance of not landing the job, with a realistic fallback role.
+- **Financial-independence age** compares the portfolio with 25x the budget
+  your pay sets (not spending the portfolio itself funds), so it no longer
+  drifts out of reach as wealth grows.
 - **Decision points** (Decide tab): start on path A and, at a chosen age,
   switch to path B on the simulated lives that meet a rule (liquid savings or
   net worth above a threshold). Shows the share that switch and how the mixed
