@@ -1,0 +1,19 @@
+extends: doctor.yaml
+name: Physician (academic medicine)
+description: >
+  Medical school and residency as in the physician path, then faculty at an
+  academic medical center: lower clinical pay, teaching and research time.
+
+sources:
+  - "Medscape 2026 via Advisory Board (private-sector benchmark the discount is applied to): https://www.advisory.com/daily-briefing/2026/06/04/physician-compensation"
+
+assumptions:
+  - "Academic attendings earn ~15-20% less than the Medscape averages: ~$250k primary care, ~$340k specialist. CHECK against the AAMC Faculty Salary Report (not found in search)."
+  - "~55 hours a week including research and teaching."
+  - "Public Service Loan Forgiveness could cancel remaining federal loans after 10 years at a nonprofit hospital. Not modeled, so debt here is conservative."
+
+events:
+  - {name: Attending (primary care), amount: 250000}
+  - {name: Attending (specialist), amount: 340000}
+  - {name: Attending hours (primary care), amount: 55}
+  - {name: Attending hours (specialist), amount: 57}

@@ -1,0 +1,1085 @@
+"""STATS Projections: Streamlit front end over the same engine as the CLI.
+
+    streamlit run app.py
+
+Two modes:
+
+* Careers: a personal profile (profiles/) plus each career path (careers/),
+  compared on the same random draws.
+* Life scenarios: the standalone scenario files in scenarios/.
+
+Files stay the source of truth. The "What if" tab edits a copy of the
+reference and can save the edits as a small override file that ``extends`` it.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+
+import altair as alt
+import numpy as np
+import pandas as pd
+import streamlit as st
+import yaml
+
+from stats_projections import ScenarioError, compare, load_scenario, simulate, summarize
+from stats_projections.config import career_info, compose, from_dict
+from stats_projections.edit import diff, to_dict
+from stats_projections.report import (
+    COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
+    debt_metrics, hours_metrics, income_milestones, net_worth_milestones, strategy_metrics,
+    tier_shares)
+from stats_projections.sensitivity import Steps, analyze, knobs
+
+ROOT = Path(__file__).resolve().parent
+SCENARIO_DIR = ROOT / "scenarios"
+CAREER_DIR = ROOT / "careers"
+PROFILE_DIR = ROOT / "profiles"
+LIFE_DIR = ROOT / "life"
+STRATEGY_DIR = ROOT / "strategies"
+WHAT_IF = "What if"
+
+st.set_page_config(page_title="STATS Projections", page_icon="📈", layout="wide")
+
+
+# ----------------------------------------------------------------------------
+# Cached engine calls. Scenario is a frozen dataclass, so it is a dict key.
+# ----------------------------------------------------------------------------
+
+
+@st.cache_resource
+def _cache() -> dict:
+    return {}
+
+
+def run(s):
+    cache = _cache()
+    if s not in cache:
+        if len(cache) > 64:
+            cache.clear()
+        cache[s] = simulate(s)
+    return cache[s]
+
+
+def run_sensitivity(s, steps: Steps):
+    cache = _cache()
+    key = ("sensitivity", s, steps)
+    if key not in cache:
+        cache[key] = analyze(s, steps, base=run(s))
+    return cache[key]
+
+
+def load_all(mode: str, profile: Path | None = None, life=(), strategy: Path | None = None,
+             career: Path | None = None) -> dict[str, tuple[Path, object]]:
+    """The options to compare in each mode.
+
+    * Careers: every career file on the profile, plus life events and one strategy.
+    * Strategies: one career on the profile, plus life events, under every strategy.
+    * Life scenarios: the standalone files in scenarios/.
+    """
+    out, errors = {}, []
+    if mode == "Careers":
+        items = [(f, (profile, f, *life, *([strategy] if strategy else [])), {})
+                 for f in sorted(CAREER_DIR.glob("*.yaml"))]
+    elif mode == "Strategies":
+        items = [(g, (profile, career, *life, g), {"name": file_name(g)})
+                 for g in sorted(STRATEGY_DIR.glob("*.yaml"))]
+    else:
+        items = [(f, None, {}) for f in sorted(SCENARIO_DIR.glob("*.yaml"))]
+    for f, parts, over in items:
+        try:
+            s = compose(*parts, **over) if parts else load_scenario(f)
+            out[s.name] = (f, s)
+        except ScenarioError as exc:
+            errors.append(f"{f.name}: {exc}")
+    for e in errors:
+        st.sidebar.error(e)
+    return out
+
+
+def file_name(f: Path) -> str:
+    try:
+        return career_info(f)["name"]
+    except ScenarioError:
+        return f.stem
+
+
+def money(x: float) -> str:
+    sign, x = ("-" if x < 0 else ""), abs(x)
+    if x >= 1e6:
+        return f"{sign}${x / 1e6:.2f}M"
+    return f"{sign}${x / 1e3:,.0f}k" if x >= 1e3 else f"{sign}${x:,.0f}"
+
+
+# ----------------------------------------------------------------------------
+# Sidebar: pick what to compare and the shared assumptions
+# ----------------------------------------------------------------------------
+
+CORE_CAREERS = ("rd_engineer", "regulator", "device_sales", "doctor", "entrepreneur")
+
+with st.sidebar:
+    st.title("STATS Projections")
+    mode = st.radio("Compare", ["Careers", "Strategies", "Life scenarios"], horizontal=True,
+                    help="Careers: your profile under each career path. Strategies: one career "
+                         "under each finance strategy (FIRE, coast...). Life scenarios: the "
+                         "standalone files in scenarios/.")
+    profile_file, life_files, strategy_file, career_file = None, [], None, None
+    if mode != "Life scenarios":
+        profiles = sorted(PROFILE_DIR.glob("*.yaml"))
+        if not profiles:
+            st.error(f"No profile files in {PROFILE_DIR}")
+            st.stop()
+        profile_file = st.selectbox("Profile", profiles, format_func=lambda p: p.stem)
+        if mode == "Strategies":
+            careers = sorted(CAREER_DIR.glob("*.yaml"))
+            career_file = st.selectbox(
+                "Career", careers, format_func=file_name,
+                index=next((i for i, c in enumerate(careers) if c.stem == "rd_engineer"), 0))
+        life_files = st.multiselect("Life events", sorted(LIFE_DIR.glob("*.yaml")),
+                                    format_func=file_name,
+                                    help="Layered on every option: partner, kids, moving abroad.")
+        if mode == "Careers":
+            strategies = sorted(STRATEGY_DIR.glob("*.yaml"))
+            strategy_file = st.selectbox(
+                "Finance strategy", strategies, format_func=file_name,
+                index=next((i for i, g in enumerate(strategies) if g.stem == "work_to_65"), 0))
+
+scenarios = load_all(mode, profile_file, tuple(life_files), strategy_file, career_file)
+if not scenarios:
+    st.error("No valid scenario or career files found.")
+    st.stop()
+
+names = list(scenarios)
+ref_key = {"Careers": "rd_engineer", "Strategies": "work_to_65"}.get(mode, "baseline")
+default_base = next((n for n, (f, _) in scenarios.items() if f.stem == ref_key), names[0])
+
+with st.sidebar:
+    label = {"Careers": "Reference career", "Strategies": "Reference strategy"}.get(mode, "Baseline")
+    base_name = st.selectbox(label, names, index=names.index(default_base))
+    others = [n for n in names if n != base_name]
+    if mode == "Careers":
+        default_others = [n for n in others if scenarios[n][0].stem in CORE_CAREERS]
+        st.caption(f"{len(names)} careers available; the five core paths are preselected.")
+    else:
+        default_others = others
+    chosen = st.multiselect("Compare with", others, default=default_others)
+
+    base_file, base = scenarios[base_name]
+    save_dir = {"Careers": CAREER_DIR, "Life scenarios": SCENARIO_DIR}.get(mode)
+
+    st.subheader("Shared assumptions")
+    st.caption("Applied to every option, so comparisons stay fair.")
+    paths = st.select_slider("Paths", [1000, 2000, 5000, 10000, 20000, 50000], value=base.paths)
+    seed = st.number_input("Random seed", value=base.seed, step=1)
+    floor = st.number_input("Failure floor ($)", value=float(base.failure_floor), step=5000.0)
+
+    r = base.returns
+    if r.model == "bootstrap":
+        st.info(f"Returns resampled from {Path(r.data).name} (block {r.block_size}).")
+        returns = r
+    else:
+        model = st.radio("Return model", ["normal", "student_t"],
+                         index=0 if r.model == "normal" else 1, horizontal=True,
+                         help="student_t keeps the mean and volatility but adds fatter tails (more crashes).")
+        mean = st.slider("Portfolio return (nominal)", 0.0, 12.0, round(r.mean * 100, 2), 0.25,
+                         format="%.2f%%")
+        stdev = st.slider("Return volatility", 0.0, 30.0, round(r.stdev * 100, 1), 0.5,
+                          format="%.1f%%")
+        dof = r.dof
+        if model == "student_t":
+            dof = st.slider("Tail heaviness (degrees of freedom)", 3.0, 30.0, float(r.dof), 0.5,
+                            help="Lower = fatter tails.")
+        returns = replace(r, model=model, mean=round(mean / 100, 6),
+                          stdev=round(stdev / 100, 6), dof=dof)
+
+    i = base.inflation
+    infl_mean = st.slider("Inflation", 0.0, 8.0, round(i.mean * 100, 1), 0.1, format="%.1f%%")
+    infl_sd = st.slider("Inflation volatility", 0.0, 5.0, round(i.stdev * 100, 1), 0.1,
+                        format="%.1f%%")
+    inflation = replace(i, mean=round(infl_mean / 100, 6), stdev=round(infl_sd / 100, 6))
+
+
+def shared(s):
+    return replace(s, paths=int(paths), seed=int(seed), failure_floor=float(floor),
+                   returns=returns, inflation=inflation)
+
+
+# ----------------------------------------------------------------------------
+# What-if editor (built before the results so they can include it)
+# ----------------------------------------------------------------------------
+
+tab_names = ["Results", "Milestones", "Lifestyle", "Hours", "Cash flow", "What if",
+             "Sensitivity", "Files"]
+if profile_file:
+    tab_names.insert(5, "Assumptions")
+tabs = dict(zip(tab_names, st.tabs(tab_names)))
+tab_results, tab_edit, tab_sens, tab_files = (
+    tabs["Results"], tabs["What if"], tabs["Sensitivity"], tabs["Files"])
+
+base_raw = to_dict(base)
+prev_streams = {d["name"]: d for d in (*base_raw["income"], *base_raw["expenses"])}
+prev_events = {d["name"]: d for d in base_raw["events"]}
+# Editor state belongs to one reference and one set of add-ons.
+ed = f"{mode}/{base_name}/{[p.stem for p in life_files]}/{getattr(strategy_file, 'stem', '')}"
+
+with tab_edit:
+    st.markdown(
+        f"Edit a copy of **{base_name}**. Changes appear as a **{WHAT_IF}** line on the "
+        "Results tab. Money is in today's dollars. Year 0 is now. Growth is real "
+        "(above inflation). Taxable income is gross pay."
+    )
+    if st.button("Reset to reference"):
+        for k in list(st.session_state):
+            if str(k).startswith(ed):
+                del st.session_state[k]
+
+    start_balance = st.number_input(
+        "Starting balance ($)", value=float(base.starting_balance), step=5000.0, key=f"{ed}/start"
+    )
+
+    def stream_frame(items):
+        return pd.DataFrame([{
+            "name": x.name, "amount": x.amount, "start_year": x.start_year,
+            "end_year": x.end_year, "growth %": round(x.growth.mean * 100, 8),
+            "growth volatility %": round(x.growth.stdev * 100, 8),
+            "noise %": round(x.noise * 100, 8),
+            "job-gap chance %": round(x.loss_probability * 100, 8),
+            "taxable": x.taxable,
+        } for x in items])
+
+    stream_cols = {
+        "name": st.column_config.TextColumn("Name", required=True),
+        "amount": st.column_config.NumberColumn("Amount ($/yr)", min_value=0, step=1000, format="%d"),
+        "start_year": st.column_config.NumberColumn("Start year", min_value=0, step=1),
+        "end_year": st.column_config.NumberColumn("End year", min_value=0, step=1,
+                                                  help="First year without it. Blank = forever."),
+        "growth %": st.column_config.NumberColumn("Growth %", step=0.1, format="%.2f"),
+        "growth volatility %": st.column_config.NumberColumn("Growth vol %", min_value=0,
+                                                             step=0.1, format="%.2f"),
+        "noise %": st.column_config.NumberColumn("Noise %", min_value=0, step=1, format="%.0f",
+                                                 help="Year-to-year swing that does not compound, "
+                                                      "e.g. bonus or commission."),
+        "job-gap chance %": st.column_config.NumberColumn("Job-gap %", min_value=0,
+                                                          max_value=100, step=0.5, format="%.1f"),
+        "taxable": st.column_config.CheckboxColumn("Gross (taxed)"),
+    }
+
+    st.subheader("Income")
+    inc_df = st.data_editor(stream_frame(base.income), column_config=stream_cols,
+                            num_rows="dynamic", hide_index=True, key=f"{ed}/income",
+                            use_container_width=True)
+    st.subheader("Expenses")
+    exp_df = st.data_editor(stream_frame(base.expenses),
+                            column_config={k: v for k, v in stream_cols.items() if k != "taxable"},
+                            column_order=[c for c in stream_cols if c != "taxable"],
+                            num_rows="dynamic", hide_index=True, key=f"{ed}/expenses",
+                            use_container_width=True)
+
+    stream_names = [n for n in [*inc_df["name"].tolist(), *exp_df["name"].tolist()]
+                    if isinstance(n, str) and n]
+    st.subheader("Events")
+    st.caption(
+        "purchase / windfall: one-time amount. set_amount: from that year the target stream "
+        "becomes the amount (0 ends it); with a duration it reverts afterwards. loan: cash now, "
+        "repaid after the deferral. Probability: chance it happens at all. Events in the same "
+        "group are mutually exclusive outcomes. Linked events follow another event's year and "
+        "only happen if it does."
+    )
+    ev_df = pd.DataFrame([{
+        "name": e.name, "type": e.type, "year": e.year if not e.same_time_as else None,
+        "amount": e.amount, "target": e.target, "probability %": round(e.probability * 100, 8),
+        "group": e.group, "jitter": e.jitter, "same_time_as": e.same_time_as,
+        "offset": e.offset, "duration": e.duration,
+    } for e in base.events])
+    event_names = [e.name for e in base.events]
+    ev_df = st.data_editor(
+        ev_df,
+        column_config={
+            "name": st.column_config.TextColumn("Name", required=True),
+            "type": st.column_config.SelectboxColumn(
+                "Type", options=["purchase", "windfall", "set_amount", "loan"], required=True),
+            "year": st.column_config.NumberColumn("Year", min_value=0, step=1),
+            "amount": st.column_config.NumberColumn("Amount ($)", min_value=0, step=1000, format="%d"),
+            "target": st.column_config.SelectboxColumn("Target stream", options=stream_names),
+            "probability %": st.column_config.NumberColumn("Probability %", min_value=0,
+                                                           max_value=100, step=5, format="%.0f"),
+            "group": st.column_config.TextColumn("Outcome group"),
+            "jitter": st.column_config.NumberColumn("Jitter (yrs)", min_value=0, step=1),
+            "same_time_as": st.column_config.SelectboxColumn("Linked to", options=event_names),
+            "offset": st.column_config.NumberColumn("Offset (yrs)", step=1),
+            "duration": st.column_config.NumberColumn("Duration (yrs)", min_value=1, step=1),
+        },
+        num_rows="dynamic", hide_index=True, key=f"{ed}/events", use_container_width=True,
+    )
+    st.caption("Loan rate, term and deferral, windfall tax and spread are kept from the file; "
+               "edit them in the YAML.")
+
+    ls0 = base.lifestyle
+    tier_df = None
+    if ls0 is not None:
+        st.subheader("Lifestyle tiers (monthly budget, today's $)")
+        st.caption("Each year your affordable income = 3-year average take-home + the withdrawal "
+                   "rate x your portfolio. Reaching a tier's take-home switches to its budget; "
+                   "between tiers you also spend the creep share of every extra dollar.")
+        lc1, lc2 = st.columns(2)
+        creep_in = lc1.number_input("Lifestyle creep (% of each extra dollar spent)", 0.0, 100.0,
+                                    round(ls0.creep * 100, 6), 5.0, key=f"{ed}/creep")
+        wr_in = lc2.number_input("Perpetual withdrawal rate (%)", 0.0, 10.0,
+                                 round(ls0.withdrawal_rate * 100, 6), 0.25, key=f"{ed}/wr")
+        cat_cols = list(ls0.categories)
+        tier_df = st.data_editor(
+            pd.DataFrame([{"name": t.name, "take_home": t.take_home,
+                           **{c: dict(t.monthly).get(c) for c in cat_cols}} for t in ls0.tiers]),
+            column_config={
+                "name": st.column_config.TextColumn("Tier", required=True),
+                "take_home": st.column_config.NumberColumn("Starts at take-home ($/yr)", min_value=0,
+                                                           step=10000, format="%d"),
+                **{c: st.column_config.NumberColumn(f"{c} ($/mo)", min_value=0, step=50, format="%d")
+                   for c in cat_cols},
+            },
+            num_rows="dynamic", hide_index=True, key=f"{ed}/tiers", use_container_width=True,
+        )
+        monthly_totals = tier_df[cat_cols].fillna(0).sum(axis=1)
+        st.caption("Monthly totals: " + ", ".join(
+            f"{n}: ${v:,.0f}/mo (${12 * v:,.0f}/yr)"
+            for n, v in zip(tier_df["name"], monthly_totals) if isinstance(n, str)))
+
+
+def _num(v, default=None):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return default
+    return v
+
+
+def pct(v) -> float:
+    """Percent cell to a decimal, rounded so an untouched value round-trips exactly."""
+    return round(float(_num(v, 0.0)) / 100, 10)
+
+
+def rows_to_streams(df: pd.DataFrame) -> list[dict]:
+    out = []
+    for row in df.to_dict("records"):
+        if not isinstance(row.get("name"), str) or not row["name"].strip():
+            continue
+        name = row["name"].strip()
+        # Start from the file's version so fields not shown in the table survive.
+        d = dict(prev_streams.get(name, {"loss_fraction": 0.5}))
+        d.update({
+            "name": name,
+            "amount": float(_num(row.get("amount"), 0.0)),
+            "start_year": int(_num(row.get("start_year"), 0)),
+            "growth": {"mean": pct(row.get("growth %")),
+                       "stdev": pct(row.get("growth volatility %"))},
+            "noise": pct(row.get("noise %")),
+            "loss_probability": pct(row.get("job-gap chance %")),
+            "taxable": bool(_num(row.get("taxable"), False)),
+        })
+        end = _num(row.get("end_year"))
+        d["end_year"] = None if end is None else int(end)
+        out.append(d)
+    return out
+
+
+def rows_to_events(df: pd.DataFrame) -> list[dict]:
+    out = []
+    for row in df.to_dict("records"):
+        if not isinstance(row.get("name"), str) or not row["name"].strip():
+            continue
+        name = row["name"].strip()
+        d = dict(prev_events.get(name, {}))
+        d.update({"name": name, "type": row.get("type") or "purchase",
+                  "amount": float(_num(row.get("amount"), 0.0)),
+                  "probability": pct(_num(row.get("probability %"), 100.0)),
+                  "jitter": int(_num(row.get("jitter"), 0)),
+                  "offset": int(_num(row.get("offset"), 0))})
+        for k in ("target", "group", "same_time_as"):
+            v = _num(row.get(k))
+            d[k] = v if v else None
+        dur = _num(row.get("duration"))
+        d["duration"] = None if dur is None else int(dur)
+        if d["same_time_as"]:
+            d.pop("year", None)
+        else:
+            d["year"] = int(_num(row.get("year"), 0))
+        out.append({k: v for k, v in d.items() if v is not None})
+    return out
+
+
+def rows_to_lifestyle() -> dict | None:
+    if tier_df is None:
+        return base_raw.get("lifestyle")
+    tiers = []
+    for row in tier_df.to_dict("records"):
+        if not isinstance(row.get("name"), str) or not row["name"].strip():
+            continue
+        monthly = {c: float(v) for c in ls0.categories
+                   if (v := _num(row.get(c))) is not None}
+        tiers.append({"name": row["name"].strip(), "take_home": float(_num(row.get("take_home"), 0.0)),
+                      "monthly": monthly})
+    tiers.sort(key=lambda t: t["take_home"])
+    return {**base_raw["lifestyle"], "creep": round(creep_in / 100, 10),
+            "withdrawal_rate": round(wr_in / 100, 10), "tiers": tiers}
+
+
+what_if, what_if_error = None, None
+try:
+    raw = {**base_raw,
+           "name": WHAT_IF,
+           "portfolio": {**base_raw["portfolio"], "starting_balance": float(start_balance)},
+           "income": rows_to_streams(inc_df),
+           "expenses": rows_to_streams(exp_df),
+           "events": rows_to_events(ev_df)}
+    if rows_to_lifestyle() is not None:
+        raw["lifestyle"] = rows_to_lifestyle()
+    candidate = from_dict(raw)
+    if replace(candidate, name=base.name, source=None) != replace(base, source=None):
+        what_if = candidate
+except (ScenarioError, ValueError, TypeError, KeyError) as exc:
+    what_if_error = str(exc)
+
+with tab_edit:
+    if what_if_error:
+        st.error(f"What-if is not valid yet: {what_if_error}")
+    elif what_if is None:
+        st.info("No changes from the reference yet.")
+    else:
+        override = {"extends": base_file.name, "name": "",
+                    **diff(base, replace(what_if, name=base.name))}
+        kind = "career" if profile_file else "scenario"
+        st.subheader(f"Save as a {kind} file")
+        new_name = st.text_input("Name", value=f"{base_name} (what if)")
+        override["name"] = new_name
+        text = yaml.safe_dump(override, sort_keys=False, allow_unicode=True)
+        st.code(text, language="yaml")
+        fname = f"{_slug(new_name)}.yaml"
+        cdl, csave = st.columns(2)
+        cdl.download_button("Download YAML", text, file_name=fname, mime="text/yaml")
+        if save_dir is None:
+            csave.caption("In Strategies mode, download the change and save it as a career or "
+                          "strategy file yourself.")
+        else:
+            target_file = save_dir / fname
+            overwrite = target_file.exists()
+            if csave.button(f"{'Overwrite' if overwrite else 'Save to'} {save_dir.name}/{fname}",
+                            type="secondary" if overwrite else "primary"):
+                target_file.write_text(text, encoding="utf-8")
+                st.success(f"Saved {target_file.name}. It now appears in the lists.")
+
+
+# ----------------------------------------------------------------------------
+# Results
+# ----------------------------------------------------------------------------
+
+active = [shared(base)] + [shared(scenarios[n][1]) for n in chosen]
+if what_if is not None:
+    active.append(shared(what_if))
+results = [run(s) for s in active]
+_domain = [r.scenario.name for r in results]
+color_scale = (alt.Scale(domain=_domain, range=list(COLORS[: len(results)]))
+               if len(results) <= len(COLORS) else alt.Scale(domain=_domain, scheme="tableau20"))
+
+
+def ages(res):
+    a0 = res.scenario.start_age or 0
+    return np.arange(res.scenario.horizon_years + 1) + a0
+
+
+x_title = "Age" if base.start_age is not None else "Year"
+a0 = base.start_age or 0
+
+with tab_results:
+    st.markdown(
+        f"**{paths:,} paths**, seed {int(seed)}, all options on the same random draws. "
+        f"*P(fail)* = the portfolio drops below {money(floor)} at any point, even briefly "
+        "(a cash crunch counts). All dollars are today's dollars."
+    )
+
+    if profile_file:
+        st.subheader("Scorecard")
+        st.caption("Net worth = portfolio minus loans still owed (student loans count). "
+                   + (f"Life events: {', '.join(file_name(f) for f in life_files)}. "
+                      if life_files else "")
+                   + (f"Strategy: {file_name(strategy_file)}." if strategy_file else ""))
+        c1, c2 = st.columns(2)
+        at_age = c1.slider(f"Evaluate at {x_title.lower()}", a0 + 5,
+                           a0 + base.horizon_years, min(a0 + base.horizon_years, 65))
+        target = c2.number_input("Target net worth ($)", value=2_000_000.0, step=250_000.0)
+        rows = []
+        for res in results:
+            m = career_metrics(res, at_age, target)
+            s = summarize(res)
+            dm, hm, sm_ = debt_metrics(res), hours_metrics(res), strategy_metrics(res)
+            row = {
+                "Option": m.name,
+                f"Median at {at_age}": m.net_worth_at_age[50],
+                f"P10 at {at_age}": m.net_worth_at_age[10],
+                f"P90 at {at_age}": m.net_worth_at_age[90],
+                f"Chance ≥ {money(target)}": m.p_reach,
+                "Lifetime pay (median, pre-tax)": m.lifetime_income,
+                "Lifetime tax (median)": m.lifetime_tax,
+                "Peak year pay (median)": m.peak_income,
+                "Peak loans (median, borrowers)": dm.peak_median if dm else 0.0,
+                "Loans paid off at age": (f"{dm.debt_free_age:.0f} ({100 * dm.p_borrow:.0f}% borrow)"
+                                          if dm and dm.debt_free_age else "no loans"),
+                "Take-home per work hour": hm.take_home_per_hour if hm else np.nan,
+                "Years below $0 net worth (avg)": m.years_in_debt,
+                "P(fail)": s.p_fail,
+            }
+            if any(r.scenario.strategy and r.scenario.strategy.kind != "work" for r in results):
+                row["Strategy kicks in"] = (
+                    "n/a (works to 65)" if sm_ is None else
+                    f"{100 * sm_['p_hit']:.0f}% · age {sm_['median_age']:.0f}"
+                    if sm_["median_age"] else "never")
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        money_cols = [c for c in df.columns
+                      if c.startswith(("Median", "P10", "P90", "Lifetime", "Peak", "Take-home"))]
+        st.dataframe(
+            df, hide_index=True, use_container_width=True,
+            column_config={
+                **{c: st.column_config.NumberColumn(c, format="$%,.0f") for c in money_cols},
+                f"Chance ≥ {money(target)}": st.column_config.ProgressColumn(
+                    f"Chance ≥ {money(target)}", min_value=0, max_value=1, format="percent"),
+                "P(fail)": st.column_config.NumberColumn("P(fail)", format="percent"),
+                "Years below $0 net worth (avg)": st.column_config.NumberColumn(
+                    "Years below $0 net worth (avg)", format="%.1f"),
+            },
+        )
+
+        debt_res = [r for r in results if r.debt is not None and r.debt.any()]
+        if debt_res:
+            st.subheader("Loans owed by age (average across paths)")
+            dd = pd.concat([pd.DataFrame({"x": ages(r), "scenario": r.scenario.name,
+                                          "owed": r.debt.mean(axis=0)}) for r in debt_res])
+            st.altair_chart(
+                alt.Chart(dd).mark_line(strokeWidth=2.5).encode(
+                    x=alt.X("x:Q", title=x_title),
+                    y=alt.Y("owed:Q", title="Owed ($, today's)", axis=alt.Axis(format="$,.2s")),
+                    color=alt.Color("scenario:N", scale=color_scale, title=None),
+                    tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
+                             alt.Tooltip("owed:Q", format="$,.0f")],
+                ).properties(height=220),
+                use_container_width=True)
+            st.caption("Averages include paths that never borrow (for example, physician paths "
+                       "where admission fails), so the typical borrower owes more; see the peak "
+                       "loans column.")
+    else:
+        cols = st.columns(len(results))
+        for col, res in zip(cols, results):
+            s = summarize(res)
+            delta = None
+            if res is not results[0]:
+                d = compare(results[0], res)
+                delta = f"{100 * d.delta:+.1f} pts vs {base_name}"
+            col.metric(res.scenario.name, f"{100 * s.p_fail:.1f}%", delta, delta_color="inverse",
+                       help=f"95% CI {100 * s.ci[0]:.1f}% to {100 * s.ci[1]:.1f}%")
+            col.caption(f"Ends below floor {100 * s.p_end_below:.1f}% · median end "
+                        f"{money(s.terminal[50])}")
+
+    bands = pd.concat([
+        pd.DataFrame({"x": ages(res), "scenario": res.scenario.name,
+                      "p10": (sm := summarize(res)).bands[10], "p50": sm.bands[50],
+                      "p90": sm.bands[90]})
+        for res in results
+    ])
+    st.subheader("Median net worth with P10 to P90 band (portfolio minus loans owed)")
+    show = st.multiselect("Bands to shade", [r.scenario.name for r in results],
+                          default=[results[0].scenario.name] + ([WHAT_IF] if what_if else []))
+    area = alt.Chart(bands[bands.scenario.isin(show)]).mark_area(opacity=0.15).encode(
+        x=alt.X("x:Q", title=x_title),
+        y=alt.Y("p10:Q", title="Net worth (today's $)", axis=alt.Axis(format="$,.2s")),
+        y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, legend=None),
+    )
+    line = alt.Chart(bands).mark_line(strokeWidth=2.5).encode(
+        x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
+        tooltip=[alt.Tooltip("scenario:N"), alt.Tooltip("x:Q", title=x_title),
+                 alt.Tooltip("p10:Q", format="$,.0f", title="P10"),
+                 alt.Tooltip("p50:Q", format="$,.0f", title="Median"),
+                 alt.Tooltip("p90:Q", format="$,.0f", title="P90")],
+    )
+    zero = alt.Chart(pd.DataFrame({"y": [floor]})).mark_rule(color="gray").encode(y="y:Q")
+    st.altair_chart((area + line + zero).properties(height=420).interactive(bind_y=False),
+                    use_container_width=True)
+
+    if any(r.income is not None and r.income.any() for r in results):
+        basis = st.radio("Income shown", ["Take-home (after tax)", "Gross (before tax)"],
+                         horizontal=True)
+        take = basis.startswith("Take")
+        st.subheader(f"{'Take-home' if take else 'Gross'} income by age "
+                     "(median, shaded P10 to P90)")
+        series = {res.scenario.name: (res.take_home if take else res.income) for res in results}
+        inc = pd.concat([
+            pd.DataFrame({"x": ages(res)[:-1], "scenario": res.scenario.name,
+                          "p10": np.percentile(series[res.scenario.name], 10, axis=0),
+                          "p50": np.percentile(series[res.scenario.name], 50, axis=0),
+                          "p90": np.percentile(series[res.scenario.name], 90, axis=0),
+                          "mean": series[res.scenario.name].mean(axis=0)})
+            for res in results
+        ])
+        inc_area = alt.Chart(inc[inc.scenario.isin(show)]).mark_area(opacity=0.15).encode(
+            x=alt.X("x:Q", title=x_title),
+            y=alt.Y("p10:Q", title="Income ($/yr, today's $)", axis=alt.Axis(format="$,.2s")),
+            y2="p90:Q", color=alt.Color("scenario:N", scale=color_scale, legend=None))
+        inc_line = alt.Chart(inc).mark_line(strokeWidth=2.5).encode(
+            x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
+            tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
+                     alt.Tooltip("p50:Q", format="$,.0f", title="Median"),
+                     alt.Tooltip("mean:Q", format="$,.0f", title="Mean"),
+                     alt.Tooltip("p10:Q", format="$,.0f", title="P10"),
+                     alt.Tooltip("p90:Q", format="$,.0f", title="P90")])
+        layers = [inc_area, inc_line]
+        if take:
+            marks = pd.DataFrame({"y": list(INCOME_MILESTONES),
+                                  "label": [f"{money(v)} take-home" for v in INCOME_MILESTONES]})
+            layers.append(alt.Chart(marks).mark_rule(strokeDash=[4, 4], color="gray").encode(y="y:Q"))
+            layers.append(alt.Chart(marks).mark_text(align="left", dx=4, dy=-6, color="gray",
+                                                     fontSize=11).encode(
+                y="y:Q", text="label:N", x=alt.value(0)))
+        st.altair_chart(alt.layer(*layers).properties(height=320), use_container_width=True)
+        st.caption("Dashed lines mark the take-home milestones (see the Milestones tab). Mean (in "
+                   "the tooltip) can sit far above the median for careers with rare big outcomes.")
+
+    fail = pd.concat([
+        pd.DataFrame({"x": ages(res)[1:], "scenario": res.scenario.name,
+                      "failed": summarize(res).cumulative_failure})
+        for res in results
+    ])
+    st.subheader("Share of paths that have dropped below the floor by each age")
+    st.altair_chart(
+        alt.Chart(fail).mark_line(strokeWidth=2.5).encode(
+            x=alt.X("x:Q", title=x_title),
+            y=alt.Y("failed:Q", title="Failed by now", axis=alt.Axis(format="%")),
+            color=alt.Color("scenario:N", scale=color_scale, title=None),
+            tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
+                     alt.Tooltip("failed:Q", format=".1%")],
+        ).properties(height=240),
+        use_container_width=True,
+    )
+
+    table = []
+    for res in results:
+        s = summarize(res)
+        row = {
+            "Option": s.name, "P(fail)": f"{100 * s.p_fail:.1f}%",
+            "95% CI": f"{100 * s.ci[0]:.1f}% to {100 * s.ci[1]:.1f}%",
+            "Ends below": f"{100 * s.p_end_below:.1f}%",
+            "Median first failure": "-" if s.median_failure_year is None else
+            (f"age {res.scenario.start_age + s.median_failure_year:.0f}"
+             if res.scenario.start_age is not None else f"year {s.median_failure_year:.0f}"),
+            "P10 end": money(s.terminal[10]), "Median end": money(s.terminal[50]),
+            "P90 end": money(s.terminal[90]),
+        }
+        if res is not results[0]:
+            d = compare(results[0], res)
+            row[f"vs {base_name} (paired 95% CI)"] = (
+                f"{100 * d.delta:+.1f} pts [{100 * d.ci[0]:+.1f}, {100 * d.ci[1]:+.1f}]")
+        table.append(row)
+    st.subheader("Failure detail")
+    st.dataframe(pd.DataFrame(table), hide_index=True, use_container_width=True)
+    st.caption("A failure rate describes your assumptions, not the future. With lifestyle tiers, "
+               "spending adapts to income, so failure is rare; the Lifestyle tab shows the "
+               "budget each option sustains.")
+
+
+# ----------------------------------------------------------------------------
+# Milestones
+# ----------------------------------------------------------------------------
+
+
+def _cell(m) -> str:
+    if not m.p_ever:
+        return "never"
+    p = "<1%" if m.p_ever < 0.005 else f"{100 * m.p_ever:.0f}%"
+    return f"{p} · age {m.median_age:.0f}" if base.start_age is not None \
+        else f"{p} · year {m.median_age:.0f}"
+
+
+with tabs["Milestones"]:
+    st.markdown("All amounts are **today's dollars** (inflation already removed), so $300k means "
+                "$300k of today's buying power. Each cell: chance the milestone is ever reached, "
+                "and the median age among the paths that reach it.")
+    mc1, mc2 = st.columns(2)
+    inc_levels = mc1.multiselect("Take-home milestones ($/yr)",
+                                 [100_000, 150_000, 200_000, 250_000, 300_000, 400_000, 500_000],
+                                 default=list(INCOME_MILESTONES), format_func=money)
+    default_wr = base.lifestyle.withdrawal_rate if base.lifestyle else 0.035
+    wr = mc2.number_input("Perpetual withdrawal rate (%)", 1.0, 6.0, round(default_wr * 100, 2), 0.25,
+                          help="Share of the portfolio you could spend every year, forever, in "
+                               "today's dollars. 3-3.5% is a common conservative choice for a "
+                               "plan with no end date; 4% is the classic 30-year rule.") / 100
+
+    inc_ms = {r.scenario.name: income_milestones(r, sorted(inc_levels)) for r in results}
+    if inc_levels:
+        st.subheader("Take-home pay milestones")
+        cols = [f"{money(m.level)} take-home (≈{money(m.gross_needed)} gross)"
+                for m in next(iter(inc_ms.values()))]
+        st.dataframe(pd.DataFrame([{"Option": n, **{c: _cell(m) for c, m in zip(cols, ms)}}
+                                   for n, ms in inc_ms.items()]),
+                     hide_index=True, use_container_width=True)
+        st.caption("Gross equivalents use the scenario's tax table (single filer, California). "
+                   "One-time windfalls such as an exit payout are not take-home pay; they count "
+                   "toward net worth.")
+
+    nw_ms = {r.scenario.name: net_worth_milestones(r, NET_WORTH_MILESTONES, wr) for r in results}
+    st.subheader("Net worth milestones")
+    cols = [f"{money(m.level)} (→ {money(m.dividend)}/yr forever)"
+            for m in next(iter(nw_ms.values()))]
+    st.dataframe(pd.DataFrame([{"Option": n, **{c: _cell(m) for c, m in zip(cols, ms)}}
+                               for n, ms in nw_ms.items()]),
+                 hide_index=True, use_container_width=True)
+    st.caption(f"The bracket is the perpetual dividend: what that portfolio could pay you every "
+               f"year at {100 * wr:.2f}% if you stopped working, before tax, in today's dollars.")
+
+    st.subheader("Chance of having reached a milestone by each age")
+    options = ([f"Take-home {money(v)}" for v in sorted(inc_levels)]
+               + [f"Net worth {money(v)}" for v in NET_WORTH_MILESTONES])
+    pick = st.selectbox("Milestone", options, index=min(len(inc_levels), len(options) - 1))
+    rows = []
+    for res in results:
+        ms = inc_ms[res.scenario.name] if pick.startswith("Take") else nw_ms[res.scenario.name]
+        m = next(m for m in ms if pick.endswith(money(m.level)))
+        x = ages(res)[:-1] if pick.startswith("Take") else ages(res)[1:]
+        rows.append(pd.DataFrame({"x": x, "scenario": res.scenario.name, "p": m.by_age}))
+    st.altair_chart(
+        alt.Chart(pd.concat(rows)).mark_line(strokeWidth=2.5).encode(
+            x=alt.X("x:Q", title=x_title),
+            y=alt.Y("p:Q", title="Reached by now", axis=alt.Axis(format="%"),
+                    scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("scenario:N", scale=color_scale, title=None),
+            tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
+                     alt.Tooltip("p:Q", format=".0%", title="Reached")],
+        ).properties(height=300),
+        use_container_width=True,
+    )
+
+
+# ----------------------------------------------------------------------------
+# Lifestyle: which budget each option sustains
+# ----------------------------------------------------------------------------
+
+with tabs["Lifestyle"]:
+    ls_results = [r for r in results if r.tier is not None]
+    if not ls_results:
+        st.info("This scenario has no lifestyle tiers. Add a `lifestyle:` section to its file "
+                "(see profiles/my_profile.yaml).")
+    else:
+        ls = base.lifestyle or ls_results[0].scenario.lifestyle
+        st.markdown(
+            f"Each year, **affordable income** = average take-home over the last "
+            f"{ls.smoothing_years} years + {100 * ls.withdrawal_rate:.1f}% of the portfolio. "
+            f"It picks the highest tier you have reached; between tiers you also spend "
+            f"{100 * ls.creep:.0f}% of every extra dollar (lifestyle creep). Edit tiers on the "
+            "What if tab or in the profile file.")
+        cats = list(ls.categories)
+        budget = pd.DataFrame(
+            {"Category": cats + ["Total / month", "Total / year"]} |
+            {t.name + f" (≥{money(t.take_home)})": [dict(t.monthly).get(c, np.nan) for c in cats]
+             + [sum(a for _, a in t.monthly), 12 * sum(a for _, a in t.monthly)] for t in ls.tiers})
+        st.subheader("Tier budgets")
+        st.dataframe(budget, hide_index=True, use_container_width=True,
+                     column_config={c: st.column_config.NumberColumn(c, format="$%,.0f")
+                                    for c in budget.columns if c != "Category"})
+
+        pick_ls = st.selectbox("Option", [r.scenario.name for r in ls_results], key="ls_pick")
+        res = next(r for r in ls_results if r.scenario.name == pick_ls)
+        shares = tier_shares(res)
+        tiers_df = pd.concat([pd.DataFrame({"x": ages(res)[:-1], "tier": n, "share": v})
+                              for n, v in shares.items()])
+        st.subheader(f"{pick_ls}: share of paths living at each tier")
+        st.altair_chart(
+            alt.Chart(tiers_df).mark_area().encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("share:Q", stack="normalize", title="Share of paths",
+                        axis=alt.Axis(format="%")),
+                color=alt.Color("tier:N", sort=list(shares), title=None,
+                                scale=alt.Scale(domain=list(shares),
+                                                range=["#c9ced6", "#9cc3e6", "#2a6fdb",
+                                                       "#e07b39", "#2e9e6a", "#a94fc9"][: len(shares)])),
+                order=alt.Order("tier_order:Q"),
+                tooltip=["tier:N", alt.Tooltip("x:Q", title=x_title),
+                         alt.Tooltip("share:Q", format=".0%")],
+            ).transform_calculate(tier_order=f"indexof({list(shares)}, datum.tier)")
+            .properties(height=300),
+            use_container_width=True,
+        )
+
+        st.subheader("Typical yearly spending by category (average across paths)")
+        spend = res.flow_means["spending"]
+        sp = pd.concat([pd.DataFrame({"x": ages(res)[:-1], "category": c, "amount": v})
+                        for c, v in spend.items() if v.any()])
+        st.altair_chart(
+            alt.Chart(sp).mark_area().encode(
+                x=alt.X("x:Q", title=x_title),
+                y=alt.Y("amount:Q", stack=True, title="$/yr (today's $)",
+                        axis=alt.Axis(format="$,.2s")),
+                color=alt.Color("category:N", title=None),
+                tooltip=["category:N", alt.Tooltip("x:Q", title=x_title),
+                         alt.Tooltip("amount:Q", format="$,.0f")],
+            ).properties(height=300),
+            use_container_width=True,
+        )
+
+        rows = []
+        for r in ls_results:
+            sh = tier_shares(r)
+            a = r.scenario.start_age or 0
+            row = {"Option": r.scenario.name}
+            for age in (35, 45, 55, 65, 75):
+                t = age - a
+                if 0 <= t < r.scenario.horizon_years:
+                    best = max(sh, key=lambda n: sh[n][t])
+                    row[f"Most common at {age}"] = f"{best} ({100 * sh[best][t]:.0f}%)"
+            rows.append(row)
+        st.subheader("Most common tier by age")
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
+
+# ----------------------------------------------------------------------------
+# Hours: how much of your life each option takes
+# ----------------------------------------------------------------------------
+
+with tabs["Hours"]:
+    hour_res = [r for r in results if r.hours is not None]
+    if not hour_res:
+        st.info("These options have no work-hours schedule. Add a `time:` section "
+                "(see careers/rd_engineer.yaml).")
+    else:
+        st.markdown(f"Hours per week at work, by age. Lifetime totals assume {WEEKS_PER_YEAR} "
+                    "working weeks a year. Every career's hours are an estimate marked CHECK "
+                    "in its file, and strategies such as FIRE or coast cut them when they kick in.")
+        hrs = pd.concat([
+            pd.DataFrame({"x": ages(r)[:-1], "scenario": r.scenario.name,
+                          "p10": np.percentile(r.hours, 10, axis=0),
+                          "p50": np.percentile(r.hours, 50, axis=0),
+                          "p90": np.percentile(r.hours, 90, axis=0),
+                          "mean": r.hours.mean(axis=0)})
+            for r in hour_res])
+        st.subheader("Hours per week by age (median line, mean in tooltip)")
+        show_h = st.multiselect("Bands to shade", [r.scenario.name for r in hour_res],
+                                default=[hour_res[0].scenario.name], key="hours_bands")
+        band = alt.Chart(hrs[hrs.scenario.isin(show_h)]).mark_area(opacity=0.15).encode(
+            x=alt.X("x:Q", title=x_title), y=alt.Y("p10:Q", title="Hours / week"), y2="p90:Q",
+            color=alt.Color("scenario:N", scale=color_scale, legend=None))
+        line = alt.Chart(hrs).mark_line(strokeWidth=2.5, interpolate="step-after").encode(
+            x="x:Q", y="p50:Q", color=alt.Color("scenario:N", scale=color_scale, title=None),
+            tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
+                     alt.Tooltip("p50:Q", format=".0f", title="Median h/wk"),
+                     alt.Tooltip("mean:Q", format=".1f", title="Mean h/wk")])
+        ref = alt.Chart(pd.DataFrame({"y": [40]})).mark_rule(strokeDash=[4, 4], color="gray"
+                                                              ).encode(y="y:Q")
+        st.altair_chart(alt.layer(band, line, ref).properties(height=320), use_container_width=True)
+        st.caption("Dashed line: a 40-hour week. Options with uncertain paths (admission, "
+                   "tenure, partnership) mix outcomes in the median; the shaded band shows the spread.")
+
+        rows = []
+        for r in hour_res:
+            hm = hours_metrics(r)
+            row = {"Option": hm.name,
+                   "Lifetime work hours (median)": hm.lifetime_hours,
+                   "Years working (median)": hm.years_worked,
+                   **{f"Avg h/wk in {k}": v for k, v in hm.by_decade.items() if v},
+                   "Lifetime take-home (median)": hm.lifetime_take_home,
+                   "Take-home per work hour": hm.take_home_per_hour}
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        st.subheader("Time cost of each option")
+        st.dataframe(df, hide_index=True, use_container_width=True, column_config={
+            "Lifetime work hours (median)": st.column_config.NumberColumn(format="%,.0f"),
+            "Years working (median)": st.column_config.NumberColumn(format="%.0f"),
+            "Lifetime take-home (median)": st.column_config.NumberColumn(format="$%,.0f"),
+            "Take-home per work hour": st.column_config.NumberColumn(format="$%,.0f"),
+            **{c: st.column_config.NumberColumn(format="%.0f")
+               for c in df.columns if c.startswith("Avg h/wk")},
+        })
+        st.caption("Take-home per work hour = lifetime take-home pay ÷ lifetime work hours "
+                   "(Ph.D., school and training years included).")
+
+
+# ----------------------------------------------------------------------------
+# Cash flow Sankey
+# ----------------------------------------------------------------------------
+
+with tabs["Cash flow"]:
+    import plotly.graph_objects as go
+
+    sc1, sc2 = st.columns(2)
+    pick_cf = sc1.selectbox("Option", [r.scenario.name for r in results], key="cf_pick")
+    res = next(r for r in results if r.scenario.name == pick_cf)
+    a = res.scenario.start_age or 0
+    age_cf = sc2.slider(f"{x_title}", a, a + res.scenario.horizon_years - 1, min(a + 10, a + 35),
+                        key="cf_age")
+    t = age_cf - a
+    fm = res.flow_means
+
+    def val(d, k):
+        return float(d[k][t])
+
+    nodes, links = [], []
+
+    def node(name):
+        if name not in nodes:
+            nodes.append(name)
+        return nodes.index(name)
+
+    gross, take = "Total income", "Take-home"
+    incomes = {k: val(fm["income"], k) for k in fm["income"]}
+    spendable = {s.name: s.spendable for s in res.scenario.income}
+    for k, v in incomes.items():
+        if v > 1:
+            links.append((node(k), node(gross), v))
+    for k in fm["tax"]:
+        v = val(fm["tax"], k)
+        if v > 1:
+            links.append((node(gross), node(k), v))
+    nonspend = sum(v for k, v in incomes.items() if not spendable.get(k, True))
+    take_total = sum(incomes.values()) - sum(val(fm["tax"], k) for k in fm["tax"]) - nonspend
+    if take_total > 1:
+        links.append((node(gross), node(take), take_total))
+    other = {k: val(fm["other"], k) for k in fm["other"]}
+    for k in ("Windfalls (after tax)", "Loans received"):
+        if other[k] > 1:
+            links.append((node(k), node(take), other[k]))
+    spend_total = 0.0
+    for k in fm["spending"]:
+        v = val(fm["spending"], k)
+        if v > 1:
+            links.append((node(take), node(k), v))
+            spend_total += v
+    for k in ("One-time purchases", "Loan payments"):
+        if other[k] > 1:
+            links.append((node(take), node(k), other[k]))
+    saved = float(fm["saved"][t]) - nonspend
+    if saved > 1:
+        links.append((node(take), node("Saved"), saved))
+    elif saved < -1:
+        links.append((node("From savings"), node(take), -saved))
+    if nonspend > 1:
+        links.append((node(gross), node("Saved"), nonspend))
+
+    palette = {"Saved": "#2e9e6a", "From savings": "#c9474f", take: "#2a6fdb", gross: "#6b7a8f"}
+    tax_names = set(fm["tax"])
+    colors = [palette.get(n, "#e07b39" if n in tax_names else "#9cc3e6") for n in nodes]
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(label=[f"{n}  {money(sum(v for s_, d_, v in links if d_ == i) or sum(v for s_, d_, v in links if s_ == i))}"
+                         for i, n in enumerate(nodes)],
+                  color=colors, pad=14, thickness=16),
+        link=dict(source=[s_ for s_, _, _ in links], target=[d_ for _, d_, _ in links],
+                  value=[v for _, _, v in links],
+                  hovertemplate="%{source.label} → %{target.label}: $%{value:,.0f}<extra></extra>"),
+    ))
+    fig.update_layout(height=520, margin=dict(l=10, r=10, t=10, b=10), font=dict(size=12))
+    st.subheader(f"{pick_cf} at {x_title.lower()} {age_cf}: where a year's money goes "
+                 "(average across paths, today's $)")
+    st.plotly_chart(fig, use_container_width=True)
+    income_total = sum(incomes.values())
+    if income_total > 0:
+        rate = (max(saved, 0) + nonspend) / income_total
+        st.caption(f"Total income {money(income_total)} · taxes "
+                   f"{money(sum(val(fm['tax'], k) for k in fm['tax']))} · spending "
+                   f"{money(spend_total)} · saved {money(max(saved, 0) + nonspend)} "
+                   f"(savings rate {100 * rate:.0f}% of gross). Averages across paths can mix "
+                   "outcomes, such as admitted and not-admitted paths for the physician.")
+
+
+# ----------------------------------------------------------------------------
+# Career assumptions and sources
+# ----------------------------------------------------------------------------
+
+def show_info(f: Path, expanded: bool) -> None:
+    info = career_info(f)
+    with st.expander(f"{info['name']}  ({f.parent.name}/{f.name})", expanded=expanded):
+        if info["description"]:
+            st.write(info["description"])
+        if info["assumptions"]:
+            st.markdown("**Assumptions**")
+            st.markdown("\n".join(f"- {a}" for a in info["assumptions"]))
+        if info["sources"]:
+            st.markdown("**Sources**")
+            st.markdown("\n".join(f"- {s}" for s in info["sources"]))
+
+
+if profile_file:
+    with tabs["Assumptions"]:
+        st.markdown("Every number comes from the files below. Edit the YAML (or use the What if "
+                    "tab) to change an assumption. Items marked CHECK are guesses rather than "
+                    "sourced figures.")
+        if mode == "Strategies":
+            st.subheader("Career")
+            show_info(career_file, True)
+        for n in [base_name, *chosen]:
+            show_info(scenarios[n][0], n == base_name)
+        if life_files or strategy_file:
+            st.subheader("Add-ons")
+            for f in [*life_files, *([strategy_file] if strategy_file else [])]:
+                show_info(f, False)
+
+
+# ----------------------------------------------------------------------------
+# Sensitivity
+# ----------------------------------------------------------------------------
+
+with tab_sens:
+    target_name = st.selectbox("Option", [r.scenario.name for r in results],
+                               index=len(results) - 1 if what_if else 0)
+    target_s = next(r.scenario for r in results if r.scenario.name == target_name)
+    c1, c2, c3, c4 = st.columns(4)
+    money_step = c1.number_input("Dollar nudge (%)", 1.0, 50.0, 10.0, 1.0) / 100
+    rate_step = c2.number_input("Return / inflation nudge (pts)", 0.1, 5.0, 1.0, 0.1) / 100
+    year_step = int(c3.number_input("Timing nudge (yrs)", 0, 10, 2, 1))
+    top = int(c4.number_input("Inputs shown", 3, 40, 15, 1))
+    steps = Steps(money=money_step, rate=rate_step, years=year_step)
+
+    key = ("sensitivity", target_s, steps)
+    if key not in _cache():
+        n_runs = 2 * len(knobs(target_s, steps))
+        st.caption(f"Needs {n_runs} extra simulations of {target_s.paths:,} paths.")
+        go = st.button("Run sensitivity", type="primary")
+    else:
+        go = True
+    if go:
+        with st.spinner("Nudging each input down and up..."):
+            sa = run_sensitivity(target_s, steps)
+        rows = sa.rows[:top]
+        base_p = sa.base.p_fail
+        order = [r.knob.label for r in rows]
+        df = pd.DataFrame(
+            [{"input": r.knob.label, "side": "input lower", "value": r.knob.low_desc,
+              "p": r.p_low, "base": base_p} for r in rows]
+            + [{"input": r.knob.label, "side": "input higher", "value": r.knob.high_desc,
+                "p": r.p_high, "base": base_p} for r in rows]
+        )
+        chart = alt.Chart(df).mark_bar(height=14).encode(
+            y=alt.Y("input:N", sort=order, title=None),
+            x=alt.X("base:Q", title="Probability of failure", axis=alt.Axis(format="%")),
+            x2="p:Q",
+            color=alt.Color("side:N", scale=alt.Scale(domain=["input lower", "input higher"],
+                                                      range=[COLORS[0], COLORS[1]]), title=None),
+            tooltip=["input:N", "side:N", "value:N", alt.Tooltip("p:Q", format=".1%", title="P(fail)")],
+        )
+        rule = alt.Chart(pd.DataFrame({"x": [base_p]})).mark_rule(color="black").encode(x="x:Q")
+        st.subheader(f"What moves the failure rate (base {100 * base_p:.1f}%)")
+        st.altair_chart((chart + rule).properties(height=26 * len(rows) + 40),
+                        use_container_width=True)
+        st.dataframe(pd.DataFrame([{
+            "Input": r.knob.label, "Low": r.knob.low_desc, "P(fail) low": f"{100 * r.p_low:.1f}%",
+            "High": r.knob.high_desc, "P(fail) high": f"{100 * r.p_high:.1f}%",
+            "Swing (pts)": round(100 * r.swing, 1),
+        } for r in sa.rows]), hide_index=True, use_container_width=True)
+        st.caption("Compare swings within one kind of nudge: a 10% salary change and a "
+                   "1-point return change are different-sized questions.")
+
+
+# ----------------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------------
+
+with tab_files:
+    if profile_file:
+        with st.expander(f"Profile ({profile_file.name})", expanded=True):
+            st.code(profile_file.read_text(encoding="utf-8"), language="yaml")
+    for n in [base_name, *chosen]:
+        f, _ = scenarios[n]
+        with st.expander(f"{n}  ({f.name})", expanded=not profile_file and n == base_name):
+            st.code(f.read_text(encoding="utf-8"), language="yaml")

@@ -1,0 +1,27 @@
+# Two years of retraining, then a higher paying career.
+extends: baseline.yaml
+name: Career switch
+description: Leave the job in year 3 for a 2-year program, then earn more.
+
+events:
+  - name: Start program
+    type: set_amount
+    target: Salary
+    amount: 15000             # part-time / stipend income while studying
+    year: 3
+    jitter: 1
+  - name: Tuition year 1
+    type: purchase
+    amount: 25000
+    same_time_as: Start program
+  - name: Tuition year 2
+    type: purchase
+    amount: 25000
+    same_time_as: Start program
+    offset: 1
+  - name: New career
+    type: set_amount
+    target: Salary
+    amount: 95000
+    same_time_as: Start program
+    offset: 2

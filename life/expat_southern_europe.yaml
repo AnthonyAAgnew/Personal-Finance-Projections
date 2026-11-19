@@ -1,0 +1,28 @@
+name: Remote work abroad (rural Italy / Spain)
+description: >
+  Around age 33, move to a cheaper country (rural Italy or Spain) and keep
+  working remotely for a US employer. Only realistic for remote-friendly
+  careers (data, AI, patent prosecution, some quant and design roles), not
+  for clinical, lab, sales or regulator jobs.
+
+sources:
+  - "IRS Form 2555: 2025 foreign earned income exclusion up to $130,000 per person: https://www.irs.gov/node/40501"
+
+assumptions:
+  - "Pay is location-adjusted down ~15% after the move. CHECK"
+  - "Living costs (every budget category and tier) fall to ~60% of Irvine levels. CHECK: Numbeo comparisons were not returned by search."
+  - "One-time moving and visa cost ~$25k."
+  - "Taxes kept at the US + California table. In reality you would owe Italian or Spanish income tax (often higher than US rates), offset by the foreign earned income exclusion and foreign tax credits, and you could stop owing California tax. Treat taxes here as a rough stand-in."
+  - "To model China or another country, copy this file and change the cost index and pay factor."
+
+lifestyle:
+  cost_index: [[4, 0.6]]
+
+events:
+  - {name: Move abroad, type: scale, target: Career pay, factor: 0.85, year: 4}
+  - {name: Moving and visa costs, type: purchase, amount: 25000, same_time_as: Move abroad}
+  - name: Cheaper living abroad
+    type: scale
+    target: [Housing, Food, Transport, Health & insurance, Utilities & phone, Fun & dining, Travel, Shopping & other]
+    factor: 0.6
+    same_time_as: Move abroad

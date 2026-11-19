@@ -1,0 +1,3 @@
+name: Work to 65
+description: Keep working until the planned retirement at 65; spending follows the lifestyle tiers.
+strategy: {name: Work to 65, kind: work}

@@ -1,0 +1,44 @@
+name: R&D engineer
+description: >
+  Industry R&D in medical devices after the Ph.D. (e.g. back to J&J or a large
+  OEM). Enters at senior/principal level given the Ph.D. plus 4 years of J&J
+  experience. Steady pay, modest bonus swing, some layoff risk.
+
+sources:
+  - "BLS OOH, Bioengineers and biomedical engineers: median $106,950 (May 2024): https://www.bls.gov/OOH/architecture-and-engineering/biomedical-engineers.htm"
+  - "O*NET national wages 17-2031 (10th $71,850 / 90th $168,180): https://www.onetonline.org/link/localwages/17-2031.00"
+  - "Levels.fyi Medtronic: senior engineer ~$141k, principal ~$156-159k, senior principal up to ~$201k: https://www.levels.fyi/companies/medtronic/salaries/mechanical-engineer"
+
+assumptions:
+  - "Enters at $150k total pay (between Medtronic senior and principal; a Ph.D. plus prior J&J years usually places above the BLS 90th percentile of all biomedical engineers)."
+  - "Real raises average 1%/yr (above inflation; late-career raises flatten); promotion to senior principal or manager around age 40 (±2 yrs) at $195k."
+  - "3% yearly chance of a layoff gap costing 40% of that year's pay."
+  - "Employer 401(k) match about 6% of pay."
+
+income:
+  - name: Career pay
+    amount: 150000
+    start_year: 2
+    growth: {mean: 0.01, stdev: 0.03}
+    noise: 0.05                 # bonus swings
+    loss_probability: 0.03
+    loss_fraction: 0.4
+    taxable: true
+  - name: Employer 401(k) match
+    spendable: false            # goes straight into savings
+    amount: 9000
+    start_year: 2
+    end_year: 36
+    growth: {mean: 0.02, stdev: 0.0}
+
+# Hours per week: ~47 early, easing ~0.5%/yr (about 41 by 60). CHECK
+time:
+  - {name: Work hours, amount: 47, start_year: 2, growth: {mean: -0.005, stdev: 0.01}}
+
+events:
+  - name: Promotion to senior principal
+    type: set_amount
+    target: Career pay
+    amount: 195000
+    year: 10
+    jitter: 2

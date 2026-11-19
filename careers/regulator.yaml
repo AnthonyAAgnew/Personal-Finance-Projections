@@ -1,0 +1,57 @@
+name: Regulator (FDA CDRH)
+description: >
+  Medical device reviewer or scientist at FDA's Center for Devices and
+  Radiological Health (Silver Spring, MD area). Lower pay than industry, very
+  stable, and a defined-benefit FERS pension on top of Social Security.
+
+sources:
+  - "USAJOBS CDRH posting: GS-14 base $104,604-$135,987 before locality: https://www.usajobs.gov/job/784121800"
+  - "FDA biomedical engineer (0858) Title 21 recruitment: Band E $163,964-$225,011: https://fda.gov/media/184577/download"
+  - "OPM FERS basic annuity: 1.1% x high-3 x years when retiring at 62+ with 20+ years: https://www.opm.gov/retirement-center/fers-information/computation/"
+
+assumptions:
+  - "Starts at GS-13 with Washington-area locality, about $125k; GS-14 around age 35 (~$148k)."
+  - "60% chance of reaching GS-15 or a Title 21 band (~$175k) around age 41."
+  - "Pay grows ~0.5%/yr in real terms on top of promotions (step increases minus raises that lag inflation)."
+  - "Layoff risk is 2% a year: low, but not zero after the 2025 HHS reductions in force."
+  - "FERS pension of about $52k/yr from age 65 (1.1% x ~$160k high-3 x 30 years)."
+  - "TSP agency match of 5%. Housing kept the same as your profile (DC-area rent is comparable to Irvine)."
+  - "If you meant a financial (forex) regulator such as the CFTC, copy this file and change the pay: CFTC uses its own higher pay scale."
+
+income:
+  - name: Career pay
+    amount: 125000
+    start_year: 2
+    growth: {mean: 0.005, stdev: 0.01}
+    loss_probability: 0.02
+    loss_fraction: 0.5
+    taxable: true
+  - name: TSP agency match
+    spendable: false            # goes straight into savings
+    amount: 6250
+    start_year: 2
+    end_year: 36
+    growth: {mean: 0.015, stdev: 0.0}
+  - name: FERS pension
+    amount: 52000
+    start_year: 36
+    taxable: true
+
+# Hours per week: federal schedule, ~42 with little overtime. CHECK
+time:
+  - {name: Work hours, amount: 42, start_year: 2, growth: {mean: -0.002, stdev: 0.005}}
+
+events:
+  - name: Promotion to GS-14
+    type: set_amount
+    target: Career pay
+    amount: 148000
+    year: 5
+    jitter: 1
+  - name: Promotion to GS-15 / Title 21
+    type: set_amount
+    target: Career pay
+    amount: 175000
+    year: 11
+    jitter: 2
+    probability: 0.6

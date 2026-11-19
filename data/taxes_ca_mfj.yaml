@@ -1,0 +1,52 @@
+# Approximate taxes for a married couple filing jointly in California.
+# Income taxes apply to combined taxable income; payroll taxes apply to each
+# earner's wages separately (per_earner). Brackets held fixed in today's dollars.
+#
+# NOT tax advice. Approximate 2025 federal / 2024 California figures (CA joint
+# brackets are double the single brackets); verify at irs.gov and ftb.ca.gov.
+
+sources:
+  - "IRS 2025 federal brackets and standard deduction (married filing jointly): irs.gov"
+  - "California FTB 2024 tax rate schedule (married filing jointly): ftb.ca.gov"
+
+taxes:
+  - name: Federal income tax
+    deduction: 31500          # 2025 standard deduction, married filing jointly
+    brackets:
+      - [0, 0.10]
+      - [23850, 0.12]
+      - [96950, 0.22]
+      - [206700, 0.24]
+      - [394600, 0.32]
+      - [501050, 0.35]
+      - [751600, 0.37]
+  - name: California income tax
+    deduction: 11080
+    brackets:
+      - [0, 0.01]
+      - [21512, 0.02]
+      - [50998, 0.04]
+      - [80490, 0.06]
+      - [111732, 0.08]
+      - [141212, 0.093]
+      - [721318, 0.103]
+      - [865574, 0.113]
+      - [1442628, 0.123]
+      - [2000000, 0.133]
+  - name: California SDI
+    per_earner: true
+    brackets:
+      - [0, 0.012]
+  - name: Social Security
+    per_earner: true
+    brackets:
+      - [0, 0.062]
+      - [176100, 0.0]
+  - name: Medicare
+    per_earner: true
+    brackets:
+      - [0, 0.0145]
+  - name: Additional Medicare
+    brackets:
+      - [0, 0.0]
+      - [250000, 0.009]       # on combined wages above $250k (joint)

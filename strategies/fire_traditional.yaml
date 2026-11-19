@@ -1,0 +1,13 @@
+name: Traditional FIRE
+description: >
+  Save hard and stop working for good once your portfolio is 25x your yearly
+  spending (the 4% rule). Lifestyle tiers still apply.
+assumptions:
+  - "Triggers once the portfolio reaches 25x your peak yearly spending so far, checked from 3 years into your career until 65. No portfolio draws while still working."
+  - "Stopping early also stops your 401(k) match. Social Security and any pension are kept at their full amounts (they would be smaller after fewer working years: CHECK)."
+strategy:
+  name: Traditional FIRE
+  kind: fire
+  multiple: 25
+  min_year: 5             # start checking 3 years into the career
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

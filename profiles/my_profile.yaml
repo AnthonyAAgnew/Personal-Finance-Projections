@@ -1,0 +1,106 @@
+# Who you are today. Career files in careers/ are layered on top of this.
+# Year 0 = now. Two more Ph.D. years (years 0-1), so every career starts in year 2.
+# All money is in today's dollars: inflation is already taken out.
+#
+# Lines marked CHECK are guesses: replace them with your real numbers.
+
+name: My profile
+description: >
+  2nd-year Ph.D. student at UC Irvine. 4 years at J&J before the Ph.D.
+  B.S. Mechanical Engineering, M.S. BME, M.S. Statistics. Likely heading to
+  med device engineering in industry.
+start_age: 29              # CHECK: your age today
+horizon_years: 66          # plan to age 95
+paths: 10000
+seed: 42
+failure_floor: 0
+borrowing_rate: 0.06       # real rate on any unplanned debt (credit, etc.)
+
+include: ../data/taxes_ca_single.yaml
+
+portfolio:
+  starting_balance: 60000  # current net worth
+  returns:
+    model: normal
+    mean: 0.07             # nominal, diversified stock-heavy portfolio
+    stdev: 0.15
+  inflation:
+    mean: 0.025
+    stdev: 0.012
+
+income:
+  - name: Ph.D. stipend
+    amount: 40000          # take-home (already after tax)
+    end_year: 2
+  - name: Career pay       # every career file overrides this
+    amount: 0
+    start_year: 2
+    taxable: true
+  - name: Social Security
+    amount: 36000          # CHECK: estimate at ssa.gov/myaccount; ~$36k is a high earner at 67
+    start_year: 38         # age 67
+
+# Budget categories, in today's dollars per month. These are your Ph.D.-era
+# amounts; the lifestyle tiers below raise them as your income grows.
+expenses:
+  - {name: Housing, monthly: 1400, growth: {mean: 0.005, stdev: 0.01}}   # CHECK: UCI graduate housing
+  - {name: Food, monthly: 600}
+  - {name: Transport, monthly: 250}
+  - {name: Health & insurance, monthly: 100}
+  - {name: Utilities & phone, monthly: 120}
+  - {name: Fun & dining, monthly: 200}
+  - {name: Travel, monthly: 100}
+  - {name: Shopping & other, monthly: 150}
+  - {name: Giving, monthly: 0}
+  - name: Healthcare in retirement
+    amount: 8000
+    start_year: 36
+    growth: {mean: 0.02, stdev: 0.02}
+
+# Quality-of-life tiers. Each year your "affordable income" is your average
+# take-home over the last 3 years plus a perpetual draw on your portfolio
+# (withdrawal_rate x portfolio). Reaching a tier's take_home switches the
+# listed categories to that tier's monthly budget. Between tiers you also
+# spend `creep` of every extra dollar (lifestyle creep).
+lifestyle:
+  creep: 0.30              # CHECK: share of each extra dollar you spend
+  withdrawal_rate: 0.035   # perpetual draw counted as affordable income
+  smoothing_years: 3
+  tiers:
+    - name: Early career
+      take_home: 90000
+      monthly: {Housing: 2500, Food: 900, Transport: 600, Health & insurance: 300,
+                Utilities & phone: 200, Fun & dining: 500, Travel: 400,
+                Shopping & other: 400, Giving: 200}
+    - name: $200k take-home
+      take_home: 200000
+      monthly: {Housing: 4500, Food: 1400, Transport: 900, Health & insurance: 400,
+                Utilities & phone: 300, Fun & dining: 1000, Travel: 1200,
+                Shopping & other: 800, Giving: 600}
+    - name: $250k take-home
+      take_home: 250000
+      monthly: {Housing: 5500, Food: 1600, Transport: 1000, Health & insurance: 450,
+                Utilities & phone: 350, Fun & dining: 1300, Travel: 1600,
+                Shopping & other: 1000, Giving: 900}
+    - name: $300k take-home
+      take_home: 300000
+      monthly: {Housing: 6500, Food: 1800, Transport: 1200, Health & insurance: 500,
+                Utilities & phone: 400, Fun & dining: 1600, Travel: 2000,
+                Shopping & other: 1200, Giving: 1200}
+
+# Work hours per week. Careers override "Work hours"; strategies (FIRE) and
+# events (school, residency) change it like any other stream.
+time:
+  - name: Ph.D. hours
+    amount: 55             # CHECK
+    end_year: 2
+  - name: Work hours
+    amount: 0
+    start_year: 2
+
+events:
+  - name: Retire
+    type: set_amount
+    target: [Career pay, Work hours]
+    amount: 0
+    year: 36               # age 65

@@ -1,0 +1,42 @@
+name: Patent litigator (BigLaw)
+description: >
+  JD after the Ph.D., then patent litigation at a large firm on the BigLaw
+  (Cravath) salary scale. Highest pay and hours among the law paths; most
+  associates leave for in-house roles before partnership.
+
+sources:
+  - "ABA Young Lawyers Division 2024 survey: median law school debt $112,500 (via Bankrate): https://bankrate.com/loans/student-loans/average-law-school-debt"
+  - "Private law school tuition averages about $49k-$53k/yr in 2025-26 (aggregators citing ABA data): https://www.bestcolleges.com/research/law-school-cost/"
+  - "BigLaw 2025 scale: $225k first year rising to $435k in year 8, plus bonuses of $20k-$115k (BCG Search, LawFuel): https://www.bcgsearch.com/bigLaw_associate_salaries_2000-2025.php"
+  - "Bloomberg Law: the $225,000 starting salary: https://news.bloomberglaw.com/ip-law/the-225-000-starting-salary-how-big-law-associates-make-bank"
+
+assumptions:
+  - "Full-time JD in years 2-4 (ages 31-33) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
+  - "A 2L summer associate job pays ~$40k (CHECK)."
+  - "Associate pay follows the scale with bonuses: ~$245k (year 1), ~$318k (year 3), ~$385k (year 5), ~$550k (year 8)."
+  - "Around age 42: 15% make partner (~$1.2M, wide spread); 85% move in-house at ~$320k. CHECK"
+  - "~65 hours a week as an associate, ~60 as partner, ~48 in-house."
+
+income:
+  - {name: Career pay, amount: 245000, start_year: 5, growth: {mean: 0.0, stdev: 0.02}, noise: 0.05, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
+  - {name: Summer associate, amount: 40000, start_year: 3, end_year: 4, taxable: true}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 5, end_year: 36, spendable: false}
+
+time:
+  - {name: Work hours, amount: 50, start_year: 2}
+
+events:
+  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 2}
+  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 3}
+  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 4}
+  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 2}
+  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 3}
+  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 4}
+  - {name: BigLaw hours, type: set_amount, target: Work hours, amount: 65, year: 5}
+  - {name: Third-year associate, type: set_amount, target: Career pay, amount: 317500, year: 7}
+  - {name: Fifth-year associate, type: set_amount, target: Career pay, amount: 385000, year: 9}
+  - {name: Eighth-year associate, type: set_amount, target: Career pay, amount: 550000, year: 12}
+  - {name: Makes partner, type: set_amount, target: Career pay, amount: 1200000, spread: 0.5, year: 13, jitter: 1, group: partnership, probability: 0.15}
+  - {name: Moves in-house, type: set_amount, target: Career pay, amount: 320000, year: 13, jitter: 1, group: partnership, probability: 0.85}
+  - {name: Partner hours, type: set_amount, target: Work hours, amount: 60, same_time_as: Makes partner}
+  - {name: In-house hours, type: set_amount, target: Work hours, amount: 48, same_time_as: Moves in-house}

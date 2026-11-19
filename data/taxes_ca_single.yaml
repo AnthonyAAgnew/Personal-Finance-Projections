@@ -1,0 +1,53 @@
+# Approximate taxes on wages for a single filer living in California.
+# Applied to the total taxable (gross) income of each simulated year.
+# Brackets are held fixed in today's dollars (i.e. assumed indexed to inflation).
+#
+# NOT tax advice. Rates and thresholds below are approximate and from memory of
+# the 2024/2025 published tables; verify at irs.gov and ftb.ca.gov before
+# relying on small differences. Ignores pre-tax 401(k) contributions,
+# itemized deductions, credits, and capital gains (windfalls use their own
+# flat tax_rate).
+
+sources:
+  - "IRS 2025 federal brackets and standard deduction (single): irs.gov"
+  - "California FTB 2024 tax rate schedule (single): ftb.ca.gov"
+  - "SSA 2025 contribution and benefit base ($176,100): ssa.gov"
+
+taxes:
+  - name: Federal income tax
+    deduction: 15750          # 2025 standard deduction, single
+    brackets:
+      - [0, 0.10]
+      - [11925, 0.12]
+      - [48475, 0.22]
+      - [103350, 0.24]
+      - [197300, 0.32]
+      - [250525, 0.35]
+      - [626350, 0.37]
+  - name: California income tax
+    deduction: 5540           # 2024 standard deduction, single
+    brackets:
+      - [0, 0.01]
+      - [10756, 0.02]
+      - [25499, 0.04]
+      - [40245, 0.06]
+      - [55866, 0.08]
+      - [70606, 0.093]
+      - [360659, 0.103]
+      - [432787, 0.113]
+      - [721314, 0.123]
+      - [1000000, 0.133]      # includes the 1% mental health services tax
+  - name: California SDI
+    per_earner: true          # each earner's wages separately
+    brackets:
+      - [0, 0.012]            # no wage cap since 2024
+  - name: Social Security
+    per_earner: true          # each earner's wages separately
+    brackets:
+      - [0, 0.062]
+      - [176100, 0.0]
+  - name: Medicare
+    per_earner: true          # each earner's wages separately
+    brackets:
+      - [0, 0.0145]
+      - [200000, 0.0235]      # +0.9% additional Medicare tax

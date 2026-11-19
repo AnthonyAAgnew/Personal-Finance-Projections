@@ -1,0 +1,19 @@
+extends: doctor.yaml
+name: Physician (no debt, full scholarship)
+description: >
+  The physician path with medical school fully paid for: tuition and living
+  costs covered by a full-ride scholarship, so no loans. A best-case
+  comparison for the debt-financed path.
+
+assumptions:
+  - "Full scholarship covers the whole cost of attendance (tuition + living): no tuition outflow and no loans. A few schools are tuition-free, and service scholarships such as HPSP pay tuition plus a stipend, but they require years of military service afterwards (not modeled)."
+
+events:
+  - {name: Med school year 1, remove: true}
+  - {name: Med school year 2, remove: true}
+  - {name: Med school year 3, remove: true}
+  - {name: Med school year 4, remove: true}
+  - {name: Med loan year 1, remove: true}
+  - {name: Med loan year 2, remove: true}
+  - {name: Med loan year 3, remove: true}
+  - {name: Med loan year 4, remove: true}

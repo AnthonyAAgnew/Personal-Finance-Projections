@@ -1,0 +1,35 @@
+name: Postdoc then academia
+description: >
+  NIH-scale postdoc after the Ph.D., then the academic job market: a
+  tenure-track BME faculty job for a minority, industry for the rest.
+
+sources:
+  - "NIH NRSA FY2025 postdoctoral stipends: $62,232 (year 0) to $75,564 (7+): https://www.niaid.nih.gov/grants-contracts/salary-cap-stipends"
+
+assumptions:
+  - "3-5 year postdoc starting at $62,232, rising ~2%/yr with NRSA steps."
+  - "25% land a tenure-track job around age 35 (CHECK: commonly cited rates are 10-25%); the rest move to industry R&D at ~$140k, a little behind having gone straight to industry."
+  - "Assistant professor ~$125k including summer salary (CHECK: no source found for BME assistant professor pay); 80% earn tenure 6 years later (~$150k), then 60% reach full professor (~$190k)."
+  - "Denied tenure (20%): move to industry at ~$150k."
+  - "Hours: postdoc ~55, assistant professor ~60, tenured ~55, full professor ~52, industry ~47. CHECK"
+
+income:
+  - {name: Career pay, amount: 62232, start_year: 2, growth: {mean: 0.02, stdev: 0.01}, taxable: true}
+  - {name: Employer 401(k) match, amount: 0, start_year: 2, end_year: 36, spendable: false}
+
+time:
+  - {name: Work hours, amount: 55, start_year: 2}
+
+events:
+  - {name: Tenure-track job, type: set_amount, target: Career pay, amount: 125000, year: 6, jitter: 1, group: market, probability: 0.25}
+  - {name: Leaves for industry, type: set_amount, target: Career pay, amount: 140000, year: 6, jitter: 1, group: market, probability: 0.75}
+  - {name: Industry match, type: set_amount, target: Employer 401(k) match, amount: 8400, same_time_as: Leaves for industry}
+  - {name: University retirement match, type: set_amount, target: Employer 401(k) match, amount: 10000, same_time_as: Tenure-track job}
+  - {name: Assistant professor hours, type: set_amount, target: Work hours, amount: 60, same_time_as: Tenure-track job}
+  - {name: Industry hours (after postdoc), type: set_amount, target: Work hours, amount: 47, same_time_as: Leaves for industry}
+  - {name: Earns tenure, type: set_amount, target: Career pay, amount: 150000, same_time_as: Tenure-track job, offset: 6, group: tenure, probability: 0.8}
+  - {name: Denied tenure, type: set_amount, target: Career pay, amount: 150000, same_time_as: Tenure-track job, offset: 6, group: tenure, probability: 0.2}
+  - {name: Tenured hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Earns tenure}
+  - {name: Industry hours (after tenure denial), type: set_amount, target: Work hours, amount: 47, same_time_as: Denied tenure}
+  - {name: Full professor, type: set_amount, target: Career pay, amount: 190000, same_time_as: Earns tenure, offset: 6, jitter: 1, probability: 0.6}
+  - {name: Full professor hours, type: set_amount, target: Work hours, amount: 52, same_time_as: Full professor}

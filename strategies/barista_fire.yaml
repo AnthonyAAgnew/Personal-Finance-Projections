@@ -1,0 +1,13 @@
+name: Barista FIRE
+description: >
+  Like coast FIRE, but drop to a light part-time job (~25% of pay and hours)
+  once the portfolio can coast to 25x spending by 65.
+strategy:
+  name: Barista FIRE
+  kind: coast
+  multiple: 25
+  min_year: 5             # start checking 3 years into the career
+  coast_factor: 0.25
+  expected_real_return: 0.045
+  target_year: 36
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

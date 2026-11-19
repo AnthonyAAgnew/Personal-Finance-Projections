@@ -1,0 +1,85 @@
+name: Physician (MD after Ph.D.)
+description: >
+  Work as an R&D engineer for one application year, then medical school
+  (4 years, financed with loans), residency, and attending practice. If not
+  admitted, you stay an R&D engineer. Primary care or specialty is uncertain.
+
+sources:
+  - "JAMA Network Open (2026) via search: residents in high-burnout specialties average 65.4 hours/week"
+  - "Current Population Survey analysis: doctors under 36 work 54.1 hrs/week, 36+ work 50.7"
+  - "AAMC (via secondary summaries): median 2025-26 cost of attendance $75,654/yr at public MD schools; median debt $215,000 among indebted graduates: https://students-residents.aamc.org/financial-aid-resources/you-can-afford-medical-school"
+  - "AAMC 2025 resident stipend survey: PGY-1 average $68,166: https://www.aamc.org/data/stipend/"
+  - "Medscape 2026 report via Advisory Board: primary care average $298k, specialists $417k: https://www.advisory.com/daily-briefing/2026/06/04/physician-compensation"
+
+assumptions:
+  - "Applies during year 2 (right after the Ph.D.) while working as an R&D engineer ($150k)."
+  - "60% chance of admission (CHECK). National acceptance is about 40%; a Ph.D. applicant is usually stronger, but this is a guess."
+  - "Cost of attendance $75,654/yr covers tuition and living, so your normal budget categories pause during school."
+  - "All 4 years of cost borrowed at a blended 8.5% nominal (federal direct plus private). New 2026 federal caps limit professional students to $50k/yr, so part of this is likely private. Repaid over 10 years, starting once residency ends."
+  - "Residency at $68k: 3 years for primary care (60% chance) then $298k; 5 years for a specialty (40%) then $417k."
+  - "Retirement still at 65. No employer retirement match is modeled (conservative)."
+
+income:
+  - name: Career pay
+    amount: 150000
+    start_year: 2
+    growth: {mean: 0.005, stdev: 0.03}   # physician pay has roughly tracked inflation
+    noise: 0.05
+    loss_probability: 0.02
+    loss_fraction: 0.4
+    taxable: true
+
+# Hours per week: residents average ~65 (JAMA Netw Open 2026, high-burnout
+# specialties); attendings ~50-55 (CPS: 54 under 36, 51 after). CHECK
+time:
+  - {name: Work hours, amount: 47, start_year: 2, growth: {mean: -0.005, stdev: 0.01}}
+
+events:
+  - name: Admitted to med school
+    type: set_amount
+    target: Career pay
+    amount: 0
+    year: 3
+    duration: 4
+    probability: 0.6
+  - name: School covers living costs
+    type: set_amount
+    target: [Housing, Food, Transport, Health & insurance, Utilities & phone,
+             Fun & dining, Travel, Shopping & other, Giving]
+    amount: 0
+    same_time_as: Admitted to med school
+    duration: 4
+  - {name: Med school year 1, type: purchase, amount: 75654, same_time_as: Admitted to med school}
+  - {name: Med school year 2, type: purchase, amount: 75654, same_time_as: Admitted to med school, offset: 1}
+  - {name: Med school year 3, type: purchase, amount: 75654, same_time_as: Admitted to med school, offset: 2}
+  - {name: Med school year 4, type: purchase, amount: 75654, same_time_as: Admitted to med school, offset: 3}
+  - {name: Med loan year 1, type: loan, amount: 75654, rate: 0.085, defer: 7, term: 10, same_time_as: Admitted to med school}
+  - {name: Med loan year 2, type: loan, amount: 75654, rate: 0.085, defer: 6, term: 10, same_time_as: Admitted to med school, offset: 1}
+  - {name: Med loan year 3, type: loan, amount: 75654, rate: 0.085, defer: 5, term: 10, same_time_as: Admitted to med school, offset: 2}
+  - {name: Med loan year 4, type: loan, amount: 75654, rate: 0.085, defer: 4, term: 10, same_time_as: Admitted to med school, offset: 3}
+  - name: Residency
+    type: set_amount
+    target: Career pay
+    amount: 68166
+    same_time_as: Admitted to med school
+    offset: 4
+  - name: Attending (primary care)
+    type: set_amount
+    target: Career pay
+    amount: 298000
+    same_time_as: Admitted to med school
+    offset: 7
+    group: specialty
+    probability: 0.6
+  - name: Attending (specialist)
+    type: set_amount
+    target: Career pay
+    amount: 417000
+    same_time_as: Admitted to med school
+    offset: 9
+    group: specialty
+    probability: 0.4
+  - {name: Med school hours, type: set_amount, target: Work hours, amount: 60, same_time_as: Admitted to med school}
+  - {name: Residency hours, type: set_amount, target: Work hours, amount: 70, same_time_as: Admitted to med school, offset: 4}
+  - {name: Attending hours (primary care), type: set_amount, target: Work hours, amount: 52, same_time_as: Attending (primary care)}
+  - {name: Attending hours (specialist), type: set_amount, target: Work hours, amount: 56, same_time_as: Attending (specialist)}

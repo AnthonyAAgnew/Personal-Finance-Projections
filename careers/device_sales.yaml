@@ -1,0 +1,52 @@
+name: Medical device sales
+description: >
+  Technical / clinical sales in medical devices. Engineers often enter as a
+  clinical specialist or associate rep, then take a territory. High pay with
+  big commission swings and quota-driven job risk.
+
+sources:
+  - "MedReps salary report coverage: total comp ~$141k-$150k, base ~$93k-$95k plus ~$61k-$63k commission (secondary sources; verify on medreps.com)"
+  - "MedReps 2017 survey (2,854 reps): average $147,424 total, $95,791 base: https://www.prweb.com/releases/2017/05/prweb14373304.htm"
+  - "Medical device sales compensation structures: https://www.everstage.com/sales-compensation/medical-device-sales-compensation"
+
+assumptions:
+  - "Years 1-2 as a clinical specialist / associate rep: ~$100k total."
+  - "Own territory around age 34 (±1): ~$155k total, slightly above the all-medical-sales average because device reps earn more."
+  - "25% chance of becoming a top performer (~$260k) around age 38; the rest stay near average."
+  - "Commission swings ±20% a year (noise 0.20). 6% yearly chance of losing the job or territory (half a year's pay lost)."
+  - "Employer 401(k) match about 6% of base."
+
+income:
+  - name: Career pay
+    amount: 100000
+    start_year: 2
+    growth: {mean: 0.01, stdev: 0.05}
+    noise: 0.20
+    loss_probability: 0.06
+    loss_fraction: 0.5
+    taxable: true
+  - name: Employer 401(k) match
+    spendable: false            # goes straight into savings
+    amount: 5700
+    start_year: 2
+    end_year: 36
+    growth: {mean: 0.015, stdev: 0.0}
+
+# Hours per week incl. travel and case coverage: ~52, easing with seniority. CHECK
+time:
+  - {name: Work hours, amount: 52, start_year: 2, growth: {mean: -0.006, stdev: 0.02}}
+
+events:
+  - name: Own territory
+    type: set_amount
+    target: Career pay
+    amount: 155000
+    year: 4
+    jitter: 1
+  - name: Top performer
+    type: set_amount
+    target: Career pay
+    amount: 260000
+    year: 8
+    jitter: 2
+    probability: 0.25
