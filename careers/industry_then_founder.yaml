@@ -1,0 +1,82 @@
+name: Industry, then device founder
+description: >
+  Work as an R&D engineer for about 4 years after the Ph.D. to build savings,
+  regulatory experience and contacts, then found a device company and live
+  off savings (a self-funded runway) until it raises money or you return to
+  industry. Compare with "Med device entrepreneur" (founding right after the
+  Ph.D.) and "R&D engineer" (keeping the savings invested).
+
+extends: rd_engineer.yaml
+
+sources:
+  - "Kruze Consulting startup CEO salaries 2025: seed ~$147k, Series A ~$203k: https://kruzeconsulting.com/blog/post/startup-ceo-salary-report"
+  - "Citeline: VCs estimate 25-30% of device investments reach a successful exit: https://scrip.citeline.com/SC091507/Medtech-Venture-Capital-Heads-into-Unfamiliar-Terrain"
+  - "PMCF via MedDeviceGuide: median medtech M&A upfront value $171M in Q1 2026: https://meddeviceguide.com/blog/medtech-ma-market-analysis-h1-2026-deal-trends-strategic-shifts-guide"
+
+assumptions:
+  - "Leaves industry around age 35 (±1). No salary and no 401(k) match while bootstrapping; living costs come out of your portfolio (lifestyle tiers shrink as income stops)."
+  - "About 2 years later, 50% raise a seed or Series A (vs 40% when founding straight out of the Ph.D.: industry experience and contacts help, CHECK) and pay a founder salary of $175k. The other 50% return to industry at $165k."
+  - "Funded companies resolve about 5 years later (±2): 30% acquired, 70% shut down, as in the entrepreneur path."
+  - "Founder proceeds at an exit: median $6M before tax (vs $5M), since a self-funded start usually means less early dilution (CHECK). Lognormal spread 1.0, taxed at 20%."
+  - "After an exit, an industry role at $210k; after a shutdown or no funding, $175k-$165k with the 401(k) match back."
+  - "The R&D path's age-40 promotion is dropped; returning to industry is the promotion here."
+
+events:
+  - {name: Promotion to senior principal, remove: true}
+
+  - name: Leaves to found a company
+    type: set_amount
+    target: Career pay
+    amount: 0
+    year: 6
+    jitter: 1
+  - {name: No match while founding, type: set_amount, target: Employer 401(k) match, amount: 0, same_time_as: Leaves to found a company}
+  - name: Raises venture funding
+    type: set_amount
+    target: Career pay
+    amount: 175000
+    same_time_as: Leaves to found a company
+    offset: 2
+    group: funding
+    probability: 0.5
+  - name: Returns to industry (no funding)
+    type: set_amount
+    target: Career pay
+    amount: 165000
+    same_time_as: Leaves to found a company
+    offset: 2
+    group: funding
+    probability: 0.5
+  - name: Company acquired
+    type: windfall
+    amount: 6000000
+    spread: 1.0
+    tax_rate: 0.20
+    same_time_as: Raises venture funding
+    offset: 5
+    jitter: 2
+    group: outcome
+    probability: 0.3
+  - name: Role after acquisition
+    type: set_amount
+    target: Career pay
+    amount: 210000
+    same_time_as: Company acquired
+  - name: Company shuts down
+    type: set_amount
+    target: Career pay
+    amount: 175000
+    same_time_as: Raises venture funding
+    offset: 5
+    jitter: 2
+    group: outcome
+    probability: 0.7
+  - {name: Match back (no funding), type: set_amount, target: Employer 401(k) match, amount: 9000, same_time_as: Returns to industry (no funding)}
+  - {name: Match back (after acquisition), type: set_amount, target: Employer 401(k) match, amount: 9000, same_time_as: Company acquired}
+  - {name: Match back (after shutdown), type: set_amount, target: Employer 401(k) match, amount: 9000, same_time_as: Company shuts down}
+
+  - {name: Founding hours, type: set_amount, target: Work hours, amount: 65, same_time_as: Leaves to found a company}
+  - {name: Hours after funding, type: set_amount, target: Work hours, amount: 60, same_time_as: Raises venture funding}
+  - {name: Hours back in industry, type: set_amount, target: Work hours, amount: 47, same_time_as: Returns to industry (no funding)}
+  - {name: Hours after acquisition, type: set_amount, target: Work hours, amount: 47, same_time_as: Company acquired}
+  - {name: Hours after shutdown, type: set_amount, target: Work hours, amount: 47, same_time_as: Company shuts down}

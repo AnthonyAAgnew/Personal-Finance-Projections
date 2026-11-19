@@ -65,6 +65,14 @@ python -m streamlit run app.py
   - `expat_southern_europe.yaml`: remote US work from rural Italy or Spain.
 
   Pick any combination; they are layered on every option.
+- **Location (`locations/`):** Bay Area, San Diego, Boston, Minneapolis, or
+  Texas instead of Irvine, from the start of your career. Each scales pay,
+  rent, other costs and lifestyle tiers, and swaps California taxes for the
+  new state's (tax layers merge by name, so `remove: true` drops one). In the
+  app the location is applied after life events, so a partner's joint return
+  keeps the new state's taxes; on the command line, list it last.
+- **Net worth at checkpoints:** the Results tab shows median net worth (P25
+  to P75) at ages 30, 35, 40, 45, 50, 60 and 65 for every option.
 - **Finance strategies (`strategies/`):**
   - Work to 65.
   - Traditional FIRE: stop at 25x peak spending.
@@ -115,6 +123,8 @@ stipend, living costs, Social Security, and retirement age. Each file in
 | `startup_employee.yaml` | Early-stage startup employee | Carta option pools |
 | `consumer_bootstrap.yaml` | Self-funded consumer product business | SBA and BLS survival rates |
 | `quant_finance.yaml` | Quant researcher (NYC) | Jane Street and Citadel postings, TraderMath |
+| `cardiology_ep.yaml` | MD, IM residency, cardiology and EP fellowships | MedAxiom 2026, Marit Health, Medscape 2025, NRMP 2025 |
+| `industry_then_founder.yaml` | R&D engineer for ~4 years, then a self-funded device startup | Kruze, Citeline, PMCF |
 
 Each career file lists its **sources** and **assumptions**. Numbers marked
 CHECK are guesses: replace them with your own. To add a career, copy a file
@@ -240,4 +250,3 @@ print(summarize(base).p_fail, compare(base, home).delta)
   after-tax, and Social Security is untaxed.
 - Monthly steps.
 - Location-specific cost of living for each career.
-# Personal-Finance-Projections

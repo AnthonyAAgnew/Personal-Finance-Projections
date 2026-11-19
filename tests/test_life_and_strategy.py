@@ -137,3 +137,48 @@ def test_every_career_with_every_addon_composes(career):
                 ROOT / "strategies" / "coast_fire.yaml", paths=300)
     res = simulate(s)
     assert np.isfinite(res.net_worth).all()
+
+
+# --- locations and the new career presets ---------------------------------------------
+
+LOCATIONS = sorted((ROOT / "locations").glob("*.yaml"))
+
+
+@pytest.mark.parametrize("loc", LOCATIONS, ids=lambda p: p.stem)
+def test_location_layers_on_every_career(loc):
+    for career in CAREERS:
+        s = compose(PROFILE, career, loc, paths=50)
+        assert simulate(s).net_worth.shape == (50, s.horizon_years + 1)
+
+
+def test_location_after_partner_keeps_new_state_taxes():
+    s = compose(PROFILE, ROOT / "careers" / "rd_engineer.yaml", ROOT / "life" / "partner.yaml",
+                ROOT / "locations" / "texas.yaml")
+    names = {t.name for t in s.taxes}
+    assert not any("California" in n for n in names)
+    joint = next(t for t in s.taxes if t.name == "Federal income tax")
+    assert joint.deduction == 31500          # the partner's joint federal table survives
+
+
+def test_no_state_tax_raises_take_home():
+    ca = simulate(compose(PROFILE, ROOT / "careers" / "rd_engineer.yaml", paths=200))
+    tx = simulate(compose(PROFILE, ROOT / "careers" / "rd_engineer.yaml",
+                          ROOT / "locations" / "texas.yaml", paths=200))
+    # Pay is 8% lower in Texas, but no state tax: the tax bill drops by more than pay.
+    assert tx.tax[:, 5].mean() < 0.8 * ca.tax[:, 5].mean()
+
+
+def test_cardiology_ep_ladder_reaches_ep_pay_on_some_paths():
+    s = compose(PROFILE, ROOT / "careers" / "cardiology_ep.yaml", paths=4000)
+    res = simulate(s)
+    late = res.income[:, 20]                 # age ~49
+    share_ep = np.mean(late > 600_000)
+    # 60% admitted x 65% cardiology x 75% EP, about 29%.
+    assert 0.22 < share_ep < 0.36
+
+
+def test_industry_then_founder_has_unpaid_runway():
+    s = compose(PROFILE, ROOT / "careers" / "industry_then_founder.yaml", paths=2000)
+    res = simulate(s)
+    assert np.mean(res.income[:, 3] > 100_000) > 0.95     # still in industry
+    assert np.mean(res.income[:, 7] < 50_000) > 0.6        # bootstrapping, living off savings

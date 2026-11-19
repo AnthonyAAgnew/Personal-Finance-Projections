@@ -37,6 +37,7 @@ SCENARIO_DIR = ROOT / "scenarios"
 CAREER_DIR = ROOT / "careers"
 PROFILE_DIR = ROOT / "profiles"
 LIFE_DIR = ROOT / "life"
+LOCATION_DIR = ROOT / "locations"
 STRATEGY_DIR = ROOT / "strategies"
 WHAT_IF = "What if"
 
@@ -127,7 +128,7 @@ def money(x: float) -> str:
 # Sidebar: pick what to compare and the shared assumptions
 # ----------------------------------------------------------------------------
 
-CORE_CAREERS = ("rd_engineer", "regulator", "device_sales", "doctor", "entrepreneur")
+CORE_CAREERS = ("rd_engineer", "regulator", "device_sales", "doctor", "cardiology_ep", "entrepreneur")
 
 with st.sidebar:
     st.title("STATS Projections")
@@ -150,6 +151,17 @@ with st.sidebar:
         life_files = st.multiselect("Life events", sorted(LIFE_DIR.glob("*.yaml")),
                                     format_func=file_name,
                                     help="Layered on every option: partner, kids, moving abroad.")
+        location_file = st.selectbox(
+            "Location after the Ph.D.", [None, *sorted(LOCATION_DIR.glob("*.yaml"))],
+            format_func=lambda f: "Irvine (profile)" if f is None else file_name(f),
+            help="Pay, living costs and state taxes relative to Irvine, from the start of "
+                 "your career. Applied after life events, so a partner's joint return keeps "
+                 "the new state's taxes.")
+        if location_file and any(f.stem.startswith("expat") for f in life_files):
+            st.warning("Moving abroad replaces the US location, so the location is ignored.")
+            location_file = None
+        if location_file:
+            life_files = [*life_files, location_file]
         if mode == "Careers":
             strategies = sorted(STRATEGY_DIR.glob("*.yaml"))
             strategy_file = st.selectbox(
@@ -171,7 +183,7 @@ with st.sidebar:
     others = [n for n in names if n != base_name]
     if mode == "Careers":
         default_others = [n for n in others if scenarios[n][0].stem in CORE_CAREERS]
-        st.caption(f"{len(names)} careers available; the five core paths are preselected.")
+        st.caption(f"{len(names)} careers available; the six core paths are preselected.")
     else:
         default_others = others
     chosen = st.multiselect("Compare with", others, default=default_others)
@@ -588,6 +600,24 @@ with tab_results:
                     "Years below $0 net worth (avg)", format="%.1f"),
             },
         )
+
+
+        st.subheader("Net worth at checkpoints")
+        checks = [a for a in (30, 35, 40, 45, 50, 60, 65)
+                  if a0 <= a <= a0 + base.horizon_years]
+        q_label = {25: "P25", 50: "Median", 75: "P75"}
+        cp_rows = []
+        for res in results:
+            r_a0 = res.scenario.start_age or 0
+            row = {"Option": res.scenario.name}
+            for a in checks:
+                p25, p50, p75 = np.percentile(res.net_worth[:, a - r_a0], [25, 50, 75])
+                row[f"Age {a}"] = f"{money(p50)} ({money(p25)} to {money(p75)})"
+            cp_rows.append(row)
+        st.dataframe(pd.DataFrame(cp_rows), hide_index=True, use_container_width=True)
+        st.caption("Median net worth, with the middle half of paths (P25 to P75) in "
+                   "brackets. Long-training paths start behind and catch up later, so "
+                   "compare the columns, not just the last one.")
 
         debt_res = [r for r in results if r.debt is not None and r.debt.any()]
         if debt_res:

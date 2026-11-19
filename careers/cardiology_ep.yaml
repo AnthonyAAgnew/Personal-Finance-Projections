@@ -1,0 +1,74 @@
+name: Cardiac electrophysiologist (MD after Ph.D.)
+description: >
+  The long cardiology route: medical school (4 years, loans), internal
+  medicine residency (3), cardiology fellowship (3), then electrophysiology
+  fellowship (2). Each step can fail: not admitted (stay an R&D engineer),
+  no cardiology fellowship (hospitalist), or no EP fellowship (general
+  cardiologist). Full EP pay starts around age 44.
+
+extends: doctor.yaml
+
+sources:
+  - "MedAxiom 2026 survey (2025 data, 205 programs) via Becker's: EP median total compensation ~$803k: https://www.beckersasc.com/cardiology/cardiologist-compensation-hits-record-highs-10-numbers-to-know/"
+  - "Marit Health via Becker's: electrophysiologists average ~$708k: https://www.beckersasc.com/cardiology/the-cardiologist-paycheck-in-2026-10-numbers-to-know/"
+  - "Medscape 2025 via Becker's: general cardiologists average ~$520k: https://www.beckersasc.com/cardiology/10-stats-to-know-on-cardiologist-pay-in-2025"
+  - "NRMP 2025 Medicine and Pediatric Specialties Match: 73.8% of applicants preferring an IM subspecialty matched: https://www.nrmp.org/wp-content/uploads/2025/12/2025-Medicine-and-Pediatric-Specialties-MRS-Report.pdf"
+
+assumptions:
+  - "Same application year, admission chance (60%), school costs and 8.5% loans as the physician path. Loan repayment starts 3 years after school, so you repay during fellowship."
+  - "Internal medicine residency 3 years at ~$68k, then a fellowship stipend of ~$78k for cardiology and EP years (PGY-4 to PGY-8). CHECK"
+  - "65% chance of a cardiology fellowship (CHECK; NRMP reports 74% across IM subspecialties, and cardiology is among the more competitive). Otherwise a hospitalist at ~$300k from age 39."
+  - "75% of cardiology fellows who want EP get an EP fellowship (CHECK). Otherwise a general cardiologist at ~$520k from age 42."
+  - "EP attending at $700k from age 44: below the MedAxiom median ($803k), since that survey leans to private programs and total pay includes call and directorships. CHECK"
+  - "Hours: about 65/week through fellowship, ~58 as an EP attending, ~57 as a general cardiologist, ~50 as a hospitalist. CHECK"
+
+events:
+  # The general physician outcomes are replaced by the cardiology ladder.
+  - {name: Attending (primary care), remove: true}
+  - {name: Attending (specialist), remove: true}
+  - {name: Attending hours (primary care), remove: true}
+  - {name: Attending hours (specialist), remove: true}
+
+  - name: Cardiology fellowship
+    type: set_amount
+    target: Career pay
+    amount: 78000
+    same_time_as: Admitted to med school
+    offset: 7
+    group: cardiology
+    probability: 0.65
+  - name: Hospitalist (no cardiology fellowship)
+    type: set_amount
+    target: Career pay
+    amount: 300000
+    same_time_as: Admitted to med school
+    offset: 7
+    group: cardiology
+    probability: 0.35
+  - name: EP fellowship
+    type: set_amount
+    target: Career pay
+    amount: 82000
+    same_time_as: Cardiology fellowship
+    offset: 3
+    group: ep
+    probability: 0.75
+  - name: General cardiologist
+    type: set_amount
+    target: Career pay
+    amount: 520000
+    same_time_as: Cardiology fellowship
+    offset: 3
+    group: ep
+    probability: 0.25
+  - name: EP attending
+    type: set_amount
+    target: Career pay
+    amount: 700000
+    same_time_as: EP fellowship
+    offset: 2
+
+  - {name: Fellowship hours, type: set_amount, target: Work hours, amount: 65, same_time_as: Cardiology fellowship}
+  - {name: Hospitalist hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Hospitalist (no cardiology fellowship)}
+  - {name: General cardiologist hours, type: set_amount, target: Work hours, amount: 57, same_time_as: General cardiologist}
+  - {name: EP attending hours, type: set_amount, target: Work hours, amount: 58, same_time_as: EP attending}

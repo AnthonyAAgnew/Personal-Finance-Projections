@@ -247,7 +247,7 @@ class Scenario:
 # ----------------------------------------------------------------------------
 
 
-NAMED_LISTS = ("income", "expenses", "events", "time")
+NAMED_LISTS = ("income", "expenses", "events", "time", "taxes")
 
 
 def _merge(base: Any, override: Any, key: str | None = None) -> Any:
