@@ -52,11 +52,12 @@ from stats_projections.report import (
     COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
     debt_metrics, hours_metrics, income_milestones, net_worth_milestones, strategy_metrics,
     tier_shares)
+from stats_projections.decisions import RULES as DP_RULES, decide as dp_decide
 from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, pareto, score
 from stats_projections.sensitivity import Steps, analyze, knobs
 from stats_projections.breakeven import METRICS as BE_METRICS, levers as be_levers, solve as be_solve
 from stats_projections.stress import DESCRIPTIONS as STRESS_HELP, presets as stress_presets
-from stats_projections.report import (FAILURE_MODES, failure_modes, free_time,
+from stats_projections.report import (FAILURE_MODES, accounts_at, failure_modes, free_time,
                                       runway_metrics)
 
 ROOT = Path(__file__).resolve().parent
@@ -665,6 +666,25 @@ with tab_results:
                    "brackets. Long-training paths start behind and catch up later, so "
                    "compare the columns, not just the last one.")
 
+        acct_rows = []
+        for res in results:
+            ac = accounts_at(res, at_age)
+            if ac:
+                acct_rows.append({"Option": res.scenario.name, "Cash": ac["cash"],
+                                  "Taxable": ac["taxable"], "401(k) (pre-tax)": ac["traditional"],
+                                  "Roth": ac["roth"], "HSA": ac["hsa"],
+                                  "Net worth": ac["pre_tax"], "After tax": ac["after_tax"]})
+        if acct_rows:
+            st.subheader(f"Accounts at {at_age}")
+            st.dataframe(pd.DataFrame(acct_rows), hide_index=True, width="stretch",
+                         column_config={c: st.column_config.NumberColumn(format="$%,.0f")
+                                        for c in ("Cash", "Taxable", "401(k) (pre-tax)", "Roth",
+                                                  "HSA", "Net worth", "After tax")})
+            st.caption("Medians of each account (they don't add up exactly). After tax counts "
+                       "the tax still owed: income tax on 401(k) money when it comes out "
+                       "(profile's retirement_tax_rate) and capital gains on the taxable account. "
+                       "Contributions follow IRS 2025 limits while you have a paycheck.")
+
         debt_res = [r for r in results if r.debt is not None and r.debt.any()]
         if debt_res:
             st.subheader("Loans owed by age")
@@ -1178,6 +1198,55 @@ if profile_file:
                    "the two axes: nothing else beats it on both. An option beaten on both is "
                    "worth picking only for reasons outside these scores.")
         st.markdown("**Frontier:** " + ", ".join(s_.name for s_, f in zip(scored, front) if f))
+
+        st.divider()
+        st.subheader("Decision point")
+        st.markdown("Keep an option open: follow path A, and at a chosen age switch to path B on "
+                    "the lives where you can afford to. Both paths run on the same random draws, "
+                    "so each life's luck before and after the choice is the same.")
+        all_names = list(scenarios)
+        dp1, dp2 = st.columns(2)
+        ia = next((i for i, n in enumerate(all_names) if scenarios[n][0].stem == "rd_engineer"), 0)
+        ib = next((i for i, n in enumerate(all_names)
+                   if scenarios[n][0].stem == "save_then_md_ep"), min(1, len(all_names) - 1))
+        dp_a = dp1.selectbox("Start on (A)", all_names, index=ia, key="dp_a")
+        dp_b = dp2.selectbox("Maybe switch to (B)", all_names, index=ib, key="dp_b",
+                             help="Pick a B whose changes start after the decision age, e.g. "
+                                  "'Industry first, then MD / EP' with a decision at 29.")
+        dp3, dp4, dp5 = st.columns(3)
+        dp_age = dp3.number_input("Decide at age", a0 + 1, a0 + base.horizon_years - 1,
+                                  min(a0 + 7, a0 + base.horizon_years - 1), key="dp_age")
+        dp_rule = dp4.selectbox("Switch if", list(DP_RULES), format_func=DP_RULES.get,
+                                key="dp_rule")
+        dp_th = dp5.number_input("Threshold ($)", 0.0, 5e6, 250_000.0, 25_000.0, key="dp_th",
+                                 disabled=dp_rule == "always")
+        if st.button("Run the decision point", type="primary"):
+            with st.spinner("Simulating A, B and the switch..."):
+                dp = dp_decide(shared(scenarios[dp_a][1]), shared(scenarios[dp_b][1]),
+                               int(dp_age - a0), dp_rule, float(dp_th))
+            st.session_state["dp_result"] = dp
+        dp = st.session_state.get("dp_result")
+        if dp is not None:
+            col = int(np.clip(65 - a0, 0, base.horizon_years))
+            st.metric("Paths that switch", f"{100 * dp.p_switch:.0f}%")
+            rows = []
+            for lab, r_ in (("Stay on A", dp.a), ("Switch to B regardless", dp.b),
+                            ("Decide at the point", dp.combined)):
+                nw = r_.net_worth[:, col]
+                rows.append({"Plan": lab, "Median at 65": np.median(nw),
+                             "P10 at 65": np.percentile(nw, 10), "P90 at 65": np.percentile(nw, 90),
+                             "Mean at 65": nw.mean(), "Cash crunch": r_.p_fail})
+            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", column_config={
+                **{c: st.column_config.NumberColumn(format="$%,.0f")
+                   for c in ("Median at 65", "P10 at 65", "P90 at 65", "Mean at 65")},
+                "Cash crunch": st.column_config.NumberColumn(format="percent")})
+            sw = dp.switch
+            if 0 < sw.mean() < 1:
+                gain = dp.combined.net_worth[:, col] - dp.a.net_worth[:, col]
+                st.caption(f"On the lives that switched, net worth at 65 vs staying on A: median "
+                           f"{money(float(np.median(gain[sw])))}. {dp.name}.")
+            else:
+                st.caption(dp.name + ".")
 
 
 # ----------------------------------------------------------------------------

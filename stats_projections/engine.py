@@ -49,6 +49,9 @@ class Result:
     hours: np.ndarray | None = None  # (paths, years) work hours per week
     strategy_year: np.ndarray | None = None  # (paths,) year FIRE / coast began, -1 never
     cash: np.ndarray | None = None  # (paths, years + 1) cash reserve (part of portfolio)
+    # Account balances, each (paths, years + 1): taxable, traditional, roth,
+    # hsa, plus "basis" (cost basis of the taxable account).
+    accounts: dict[str, np.ndarray] | None = None
     home: np.ndarray | None = None  # (paths, years + 1) home value (in net worth only)
 
     @property
@@ -418,10 +421,10 @@ def _layer_tax(amount: np.ndarray, layer: TaxLayer) -> np.ndarray:
     return progressive_tax(amount, (layer,))
 
 
-def simulate(s: Scenario) -> Result:
+def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
     P, T = s.paths, s.horizon_years
     r, rc = market_returns(s)
-    F = flows(s)
+    F = flows(s) if F is None else F
     months, runway = reserve_months(s)
     ls = s.lifestyle
     cats = ls.categories if ls and ls.tiers else ()
@@ -455,7 +458,18 @@ def simulate(s: Scenario) -> Result:
     coast_spend = np.zeros((P, T))
     coasting = np.zeros(P, dtype=bool)  # true Coast FIRE: stopped saving
     stop_saving = st is not None and st.kind == "coast" and st.coast_mode == "stop_saving"
+    acct = s.accounts
+    if acct is not None:
+        A = {k: np.zeros((P, T + 1)) for k in ("taxable", "traditional", "roth", "hsa", "basis")}
+        A["traditional"][:, 0] = acct.traditional
+        A["roth"][:, 0] = acct.roth
+        A["hsa"][:, 0] = acct.hsa_balance
+        A["taxable"][:, 0] = s.starting_balance - acct.traditional - acct.roth - acct.hsa_balance
+        A["basis"][:, 0] = A["taxable"][:, 0]
+        income_layers = [x for x in s.taxes if not x.per_earner]
+        age0 = s.start_age if s.start_age is not None else -10**6
     net = np.empty((P, T))
+    withdrawal_tax = np.zeros((P, T))
     take_home = np.empty((P, T))
     income_total = np.empty((P, T))
     tax_total = np.empty((P, T))
@@ -479,6 +493,8 @@ def simulate(s: Scenario) -> Result:
         taxable_t = np.zeros(P)
         spendable_t = np.zeros(P)
         per_stream_taxable = []
+        match_t = np.zeros(P)
+        wage_t = np.zeros(P)
         for name, a in F.income.items():
             v = a[:, t] * factor if name in stop else a[:, t]
             inc_means[name][t] = v.mean()
@@ -488,12 +504,27 @@ def simulate(s: Scenario) -> Result:
                 per_stream_taxable.append(v)
             if F.spendable[name]:
                 spendable_t += v
+            else:
+                match_t += v
+            if acct is not None and name == acct.wage_stream:
+                wage_t = v
+        pretax_t = np.zeros(P)
+        if acct is not None:
+            working = wage_t > 0
+            defer_t = np.where(working, np.minimum(acct.k401, 0.5 * wage_t), 0.0)
+            hsa_t = np.where(working, np.minimum(acct.hsa, 0.1 * wage_t), 0.0)
+            if stop_saving:
+                defer_t = np.where(coasting, 0.0, defer_t)
+                hsa_t = np.where(coasting, 0.0, hsa_t)
+            trad_t = defer_t * (1 - acct.roth_401k_share)
+            pretax_t = trad_t + hsa_t
+        income_base = np.maximum(taxable_t - pretax_t, 0.0)
         tax_t = np.zeros(P)
         for layer in s.taxes:
             if layer.per_earner:
                 lt = sum((_layer_tax(v, layer) for v in per_stream_taxable), np.zeros(P))
             else:
-                lt = _layer_tax(taxable_t, layer)
+                lt = _layer_tax(income_base, layer)
             tax_means[layer.name][t] = lt.mean()
             tax_t += lt
         th_t = spendable_t - tax_t
@@ -534,7 +565,17 @@ def simulate(s: Scenario) -> Result:
             spent = spent + extra
         net[:, t] = c_t
         inv = W[:, t]
-        inv_g = inv * np.where(inv >= 0, 1.0 + r[:, t], 1.0 + s.borrowing_rate)
+        if acct is None:
+            inv_g = inv * np.where(inv >= 0, 1.0 + r[:, t], 1.0 + s.borrowing_rate)
+        else:
+            tx = A["taxable"][:, t]
+            g_tx = np.where(tx >= 0, tx * (1.0 + r[:, t] - acct.taxable_drag),
+                            tx * (1.0 + s.borrowing_rate))
+            g_tr = A["traditional"][:, t] * (1.0 + r[:, t])
+            g_ro = A["roth"][:, t] * (1.0 + r[:, t])
+            g_hs = A["hsa"][:, t] * (1.0 + r[:, t])
+            inv_g = g_tx + g_tr + g_ro + g_hs
+        grown = inv_g  # before this year's flow
         if s.cash is None:
             W[:, t + 1] = inv_g + c_t
         else:
@@ -553,6 +594,65 @@ def simulate(s: Scenario) -> Result:
                 top = -np.maximum(cash - target, 0.0)
             W[:, t + 1] = inv_g - top
             C[:, t + 1] = cash + top
+
+        if acct is not None:
+            # Route this year's flow into (or out of) the accounts.
+            flow = W[:, t + 1] - grown
+            basis = A["basis"][:, t].copy()
+            # Coasting (true Coast FIRE) stops contributions, and the match with them.
+            match_in = np.where(coasting, 0.0, match_t) if stop_saving else match_t
+            fixed = defer_t + hsa_t + match_in
+            g_tr = g_tr + trad_t + match_in
+            g_ro = g_ro + (defer_t - trad_t)
+            g_hs = g_hs + hsa_t
+            rest = flow - fixed
+            ira = np.where((rest > 0) & (wage_t > 0), np.minimum(acct.ira, rest), 0.0)
+            g_ro = g_ro + ira
+            add = np.maximum(rest - ira, 0.0)
+            g_tx = g_tx + add
+            basis = basis + add
+            need = np.maximum(-rest, 0.0)
+            wtax = np.zeros(P)
+            # 1. Taxable account: capital gains tax on the gain share.
+            bal = np.maximum(g_tx, 0.0)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                gain = np.where(bal > 0, np.clip(1 - basis / bal, 0, 1), 0.0)
+            keep = 1 - acct.gains_rate * gain
+            take = np.minimum(need / np.maximum(keep, 1e-9), bal)
+            got = take * keep
+            wtax += take - got
+            with np.errstate(divide="ignore", invalid="ignore"):
+                basis = np.where(bal > 0, basis * (1 - take / np.where(bal > 0, bal, 1)), basis)
+            g_tx = g_tx - take
+            need = np.maximum(need - got, 0.0)
+            # 2. Traditional 401(k): income tax, plus a penalty before access age.
+            pen = acct.early_penalty if age0 + t < acct.access_age else 0.0
+            take = need.copy()
+            for _ in range(12 if need.any() else 0):
+                extra = sum((_layer_tax(income_base + take, x) - _layer_tax(income_base, x)
+                             for x in income_layers), np.zeros(P))
+                take = np.minimum(need + extra + pen * take, g_tr)
+            extra = sum((_layer_tax(income_base + take, x) - _layer_tax(income_base, x)
+                         for x in income_layers), np.zeros(P))
+            got = np.maximum(take - extra - pen * take, 0.0)
+            wtax += take - got
+            g_tr = g_tr - take
+            need = np.maximum(need - got, 0.0)
+            # 3. Roth (contributions first: no tax), 4. HSA.
+            take = np.minimum(need, g_ro)
+            g_ro, need = g_ro - take, need - take
+            take = np.minimum(need, g_hs)
+            g_hs, need = g_hs - take, need - take
+            # Anything still missing is borrowed in the taxable account.
+            g_tx = g_tx - need
+            A["taxable"][:, t + 1] = g_tx
+            A["traditional"][:, t + 1] = g_tr
+            A["roth"][:, t + 1] = g_ro
+            A["hsa"][:, t + 1] = g_hs
+            A["basis"][:, t + 1] = np.maximum(basis, 0.0)
+            W[:, t + 1] = g_tx + g_tr + g_ro + g_hs
+            tax_total[:, t] += wtax
+            withdrawal_tax[:, t] = wtax
 
         # Strategy: decide for next year from the year-end portfolio.
         peak_spend = np.maximum(peak_spend, spent)
@@ -593,7 +693,8 @@ def simulate(s: Scenario) -> Result:
                   "Loan payments": F.loan_payments.mean(axis=0),
                   "Windfalls (after tax)": F.windfalls.mean(axis=0),
                   "Loans received": F.loans_in.mean(axis=0),
-                  "Home costs": F.home_costs.mean(axis=0)},
+                  "Home costs": F.home_costs.mean(axis=0),
+                  "Tax on withdrawals": withdrawal_tax.mean(axis=0)},
         "saved": net.mean(axis=0),
     }
     return Result(s, W + F.home - F.debt, net, r, failed, first, income_total, tax_total,
@@ -602,6 +703,7 @@ def simulate(s: Scenario) -> Result:
                   portfolio=W, debt=F.debt, hours=hours if s.time else None,
                   strategy_year=fire_year if st else None,
                   cash=C if s.cash is not None else None,
+                  accounts=A if acct is not None else None,
                   home=F.home if F.home.any() else None)
 
 

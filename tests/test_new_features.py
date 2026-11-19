@@ -129,3 +129,45 @@ def test_breakeven_finds_pay_that_matches():
     lv = next(x for x in levers(a) if "Pay" in x.label)
     be = solve(a, b, lv, at_age=20, paths=50)
     assert be.value == pytest.approx(100_000, rel=0.01)
+
+
+def test_accounts_defer_tax_and_fill_in_order():
+    s = make(income=[{"name": "Career pay", "amount": 150_000, "taxable": True}],
+             taxes=[{"name": "Income tax", "brackets": [[0, 0.25]]}],
+             accounts={"k401": 20_000, "ira": 7_000, "hsa": 4_000, "gains_rate": 0.0},
+             horizon_years=3)
+    no = replace(s, accounts=None)
+    a, b = simulate(s), simulate(no)
+    # 20k 401(k) + 4k HSA are pre-tax: 24k x 25% less income tax.
+    np.testing.assert_allclose(b.tax[:, 0] - a.tax[:, 0], 6_000)
+    A = a.accounts
+    np.testing.assert_allclose(A["traditional"][:, 1], 20_000)
+    np.testing.assert_allclose(A["hsa"][:, 1], 4_000)
+    np.testing.assert_allclose(A["roth"][:, 1], 7_000)
+    total = A["taxable"][:, 1] + 20_000 + 4_000 + 7_000
+    np.testing.assert_allclose(total, a.portfolio[:, 1])
+    assert from_dict(to_dict(s)).accounts == s.accounts
+
+
+def test_early_401k_withdrawal_pays_tax_and_penalty():
+    s = make(income=[], expenses=[{"name": "Spend", "amount": 10_000}],
+             taxes=[{"name": "Income tax", "brackets": [[0, 0.20]]}], start_age=40,
+             portfolio={"starting_balance": 100_000},
+             accounts={"traditional": 100_000, "early_penalty": 0.10, "access_age": 60},
+             horizon_years=2)
+    res = simulate(s)
+    # Net 10k needs gross g with g - 0.2 g - 0.1 g = 10k, so g = 14,286.
+    np.testing.assert_allclose(res.accounts["traditional"][:, 1], 100_000 - 10_000 / 0.7, rtol=1e-4)
+
+
+def test_decision_point_matches_a_or_b_flows():
+    from stats_projections.decisions import decide
+    a = make(income=[{"name": "Pay", "amount": 100_000}])
+    b = make(income=[{"name": "Pay", "amount": 50_000}])
+    never = decide(a, b, 5, "liquid", 1e12)
+    np.testing.assert_allclose(never.combined.net_worth, never.a.net_worth)
+    always = decide(a, b, 0, "always")
+    np.testing.assert_allclose(always.combined.net_worth, always.b.net_worth)
+    mid = decide(a, b, 5, "always")
+    np.testing.assert_allclose(mid.combined.income[:, :5], 100_000)
+    np.testing.assert_allclose(mid.combined.income[:, 5:], 50_000)
