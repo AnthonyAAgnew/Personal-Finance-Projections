@@ -1,0 +1,13 @@
+name: "Startup runway: 2 years in cash"
+description: >
+  Hold two years of spending in cash through the founding years and keep the rest invested; the second two years would come from selling investments.
+  Only founder careers (entrepreneur, industry-then-founder, consumer
+  products) have a runway window; other careers are unaffected. Without a
+  runway add-on, the founding years are paid from investments (the
+  "invested" option).
+assumptions:
+  - "Runway target = 24 months of that year's spending, held in cash during the career's runway window."
+  - "Compare with no runway add-on (everything stays invested) on the same market draws."
+portfolio:
+  cash:
+    runway_months: 24

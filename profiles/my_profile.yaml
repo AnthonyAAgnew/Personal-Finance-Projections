@@ -1,5 +1,6 @@
 # Who you are today. Career files in careers/ are layered on top of this.
-# Year 0 = now. Two more Ph.D. years (years 0-1), so every career starts in year 2.
+# Year 0 = now. Up to four more Ph.D. years (years 0-3, the worst case), so every
+# career starts in year 4 (age 26).
 # All money is in today's dollars: inflation is already taken out.
 #
 # Lines marked CHECK are guesses: replace them with your real numbers.
@@ -19,15 +20,28 @@ borrowing_rate: 0.06       # real rate on any unplanned debt (credit, etc.)
 include: ../data/taxes_ca_single.yaml
 
 sources:
+  - "Damodaran, Historical Returns on Stocks, Bonds and Bills (1928-2024): S&P 500 ~9.9%, 10-year T-bonds ~4.5%, 3-month T-bills ~3.3% nominal averages: https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
   - "Hours: HEPI analysis of the Nature 2019 PhD survey: PhD students average 47 hrs/week: https://www.hepi.ac.uk/2020/06/25/new-report-shows-phd-students-work-50-more-than-undergraduates/"
   - "Hours: BLS 2024: 11.1% of workers 25-54, 14.2% of 55-64 and 38.3% of 65+ work part time: https://www.bls.gov/opub/ted/2025/38-3-percent-of-employed-older-americans-worked-part-time-in-2024.htm"
 
+# $60k today: $20k cash reserve + $40k invested. CHECK: replace with your real split.
 portfolio:
-  starting_balance: 60000  # current net worth
-  returns:
+  starting_balance: 40000  # invested
+  cash:
+    balance: 20000         # emergency fund / checking
+    reserve_months: 6      # savings refill the reserve to 6 months of spending first
+    mean: 0.03             # nominal cash yield (T-bills averaged ~3.3% since 1928)
+    stdev: 0.01
+  returns:                 # stocks (nominal); deliberately below the ~10% US history
     model: normal
-    mean: 0.07             # nominal, diversified stock-heavy portfolio
+    mean: 0.07
     stdev: 0.15
+  bonds:                   # nominal; 10-year Treasuries averaged ~4.5% since 1928
+    mean: 0.045
+    stdev: 0.07
+    correlation: 0.1
+  # Glide path: stock share by year (90% until 45, 60% at 65, 50% at 75). CHECK
+  allocation: [[0, 0.9], [23, 0.9], [43, 0.6], [53, 0.5]]
   inflation:
     mean: 0.025
     stdev: 0.012
@@ -35,10 +49,10 @@ portfolio:
 income:
   - name: Ph.D. stipend
     amount: 40000          # take-home (already after tax)
-    end_year: 2
+    end_year: 4            # worst case: 4 more years
   - name: Career pay       # every career file overrides this
     amount: 0
-    start_year: 2
+    start_year: 4
     taxable: true
   - name: Social Security
     amount: 36000          # CHECK: estimate at ssa.gov/myaccount; ~$36k is a high earner at 67
@@ -47,11 +61,11 @@ income:
 # Budget categories, in today's dollars per month. These are your Ph.D.-era
 # amounts; the lifestyle tiers below raise them as your income grows.
 expenses:
-  - {name: Housing, monthly: 1400, growth: {mean: 0.005, stdev: 0.01}}   # CHECK: UCI graduate housing
+  - {name: Housing, monthly: 1650, growth: {mean: 0.005, stdev: 0.01}}   # rent, utilities included
   - {name: Food, monthly: 600}
   - {name: Transport, monthly: 250}
   - {name: Health & insurance, monthly: 100}
-  - {name: Utilities & phone, monthly: 120}
+  - {name: Utilities & phone, monthly: 60}    # phone only while rent includes utilities. CHECK
   - {name: Fun & dining, monthly: 200}
   - {name: Travel, monthly: 100}
   - {name: Shopping & other, monthly: 150}
@@ -99,10 +113,10 @@ lifestyle:
 time:
   - name: Ph.D. hours
     amount: 47             # Nature 2019 PhD survey (HEPI analysis): 47/week average
-    end_year: 2
+    end_year: 4
   - name: Work hours
     amount: 0
-    start_year: 2
+    start_year: 4
     noise: 0.05
 
 events:

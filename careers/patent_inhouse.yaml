@@ -14,32 +14,32 @@ sources:
   - "LeanLaw citing AIPLA 2023 Economic Survey (private-practice medians, for comparison): https://www.leanlaw.co/blog/compensation-models-for-intellectual-property-law-firms-why-your-pay-structure-might-be-your-biggest-competitive-liability/"
 
 assumptions:
-  - "Full-time JD in years 2-4 (ages 31-33) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
+  - "Full-time JD in years 4-6 (ages 26-28) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
-  - "Three years at an IP firm at ~$200k, then in-house around age 30 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
-  - "35% chance of head of IP / chief IP counsel around age 38 at ~$420k. CHECK"
+  - "Three years at an IP firm at ~$200k, then in-house around age 32 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
+  - "35% chance of head of IP / chief IP counsel around age 40 at ~$420k. CHECK"
   - "Hours: 50 in law school (CHECK), 50 at the firm (~1,800 billable), 45 in-house (CHECK)."
   - "Autonomy 92 (Lawyers). Burnout 38% (below the 42% attorney average, CHECK). Satisfaction 55% (Axiom 2024: 54% low satisfaction or open to leaving, CHECK)."
 
 income:
-  - {name: Career pay, amount: 200000, start_year: 5, growth: {mean: 0.015, stdev: 0.03}, noise: 0.08, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
-  - {name: Summer associate, amount: 40000, start_year: 3, end_year: 4, taxable: true}
-  - {name: Employer 401(k) match, amount: 10000, start_year: 5, end_year: 43, spendable: false}
+  - {name: Career pay, amount: 200000, start_year: 7, growth: {mean: 0.015, stdev: 0.03}, noise: 0.08, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
+  - {name: Summer associate, amount: 40000, start_year: 5, end_year: 6, taxable: true}
+  - {name: Employer 401(k) match, amount: 10000, start_year: 7, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 50, start_year: 2}
+  - {name: Work hours, amount: 50, start_year: 4}
 
 events:
-  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 2}
-  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 3}
-  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 4}
-  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 2}
-  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 3}
-  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 4}
-  - {name: Firm hours, type: set_amount, target: Work hours, amount: 50, year: 5}
-  - {name: Joins in-house team, type: set_amount, target: Career pay, amount: 250000, year: 8, jitter: 1}
+  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 4}
+  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 5}
+  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 6}
+  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 4}
+  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 5}
+  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 6}
+  - {name: Firm hours, type: set_amount, target: Work hours, amount: 50, year: 7}
+  - {name: Joins in-house team, type: set_amount, target: Career pay, amount: 250000, year: 10, jitter: 1, confidence: medium}
   - {name: In-house hours (patent counsel), type: set_amount, target: Work hours, amount: 45, same_time_as: Joins in-house team}
-  - {name: Head of IP, type: set_amount, target: Career pay, amount: 420000, year: 16, jitter: 2, probability: 0.35}
+  - {name: Head of IP, type: set_amount, target: Career pay, amount: 420000, year: 18, jitter: 2, probability: 0.35, confidence: low}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 92, satisfaction: 0.55, burnout: 0.38}

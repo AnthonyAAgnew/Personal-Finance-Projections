@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import draws
-from .config import Event, Scenario, Stream, TaxLayer
+from .config import CONFIDENCE, Event, Scenario, Stream, TaxLayer
 
 NEVER = 10**9  # event year on paths where the event does not happen
 
@@ -48,6 +48,8 @@ class Result:
     debt: np.ndarray | None = None  # (paths, years + 1) student and other loans owed
     hours: np.ndarray | None = None  # (paths, years) work hours per week
     strategy_year: np.ndarray | None = None  # (paths,) year FIRE / coast began, -1 never
+    cash: np.ndarray | None = None  # (paths, years + 1) cash reserve (part of portfolio)
+    home: np.ndarray | None = None  # (paths, years + 1) home value (in net worth only)
 
     @property
     def p_fail(self) -> float:
@@ -119,12 +121,34 @@ def nominal_year(s: Scenario, e: Event) -> int:
     return e.year + total
 
 
+def equity_proceeds(s: Scenario, e: Event) -> np.ndarray:
+    """After-tax founder proceeds per path from the event's cap table."""
+    eq = e.equity
+    z = draws.rng_for(s.seed, "sale", e.name).standard_normal(s.paths)
+    sigma = float(np.hypot(eq.sale_spread, CONFIDENCE[e.confidence]))
+    price = eq.sale_median * np.exp(sigma * z)
+    investors = 1.0 - eq.common
+    converts = investors * price >= eq.raised
+    as_common = eq.stake * price
+    after_pref = (eq.stake / eq.common if eq.common > 0 else 0.0) * np.maximum(price - eq.raised, 0)
+    gross = np.where(converts, as_common, after_pref)
+    tax = eq.state_rate * gross + eq.federal_rate * np.maximum(gross - eq.qsbs_cap, 0.0)
+    return gross - tax
+
+
 def event_amounts(s: Scenario, e: Event) -> np.ndarray:
-    """Per path amount: fixed, or lognormal with median ``amount``."""
-    if not e.spread:
+    """Per path amount: fixed, or lognormal with median ``amount``.
+
+    ``spread`` and the event's confidence level both widen it; a windfall
+    with ``equity`` is worked out from the cap table instead.
+    """
+    if e.equity is not None:
+        return equity_proceeds(s, e)
+    sigma = float(np.hypot(e.spread, CONFIDENCE[e.confidence]))
+    if not sigma:
         return np.full(s.paths, e.amount)
     z = draws.rng_for(s.seed, "spread", e.name).standard_normal(s.paths)
-    return e.amount * np.exp(e.spread * z)
+    return e.amount * np.exp(sigma * z)
 
 
 # ----------------------------------------------------------------------------
@@ -186,6 +210,10 @@ def _stream(
                 mask &= t[None, :] < (y + e.duration)[:, None]
             level = np.where(mask, level * e.factor, level)
 
+    sigma = CONFIDENCE[stream.confidence]
+    if sigma:
+        z = draws.rng_for(s.seed, "confidence", stream.name).standard_normal((P, 1))
+        level = level * np.exp(sigma * z)
     if stream.noise > 0:
         z = draws.standard_normal(s.seed, P, T, "noise", stream.name)
         # Mean-preserving lognormal swing around the trend; it does not compound.
@@ -246,6 +274,8 @@ class Flows:
     loans_in: np.ndarray
     loan_payments: np.ndarray
     debt: np.ndarray  # (paths, years + 1) loan balance owed at the end of each year
+    home_costs: np.ndarray  # property tax, insurance, upkeep
+    home: np.ndarray  # (paths, years + 1) home value at the end of each year
 
     @property
     def total_income(self) -> np.ndarray:
@@ -263,8 +293,34 @@ def flows(s: Scenario) -> Flows:
     hours = {st.name: stream_amounts(s, st, ev_years) for st in s.time}
 
     purchases, windfalls, loans_in, loan_payments = zeros(), zeros(), zeros(), zeros()
+    home_costs = zeros()
     debt = np.zeros((P, T + 1))
+    home = np.zeros((P, T + 1))
     rows = np.arange(P)
+
+    def add_loan(amount, rate, defer, term, y):
+        # Loan rates are nominal; payments are fixed in real terms using
+        # the scenario's mean inflation (a transparent approximation).
+        r = (1 + rate) / (1 + s.inflation.mean) - 1
+        pay = loan_payment(amount, r, defer, term)
+        for k in range(term):
+            ty = y + defer + k
+            ok = ty < T
+            np.add.at(loan_payments, (rows[ok], ty[ok]), pay[ok])
+        # Balance owed at the end of each year after disbursement: grows
+        # with interest, falls with each payment, reaches 0 after the last.
+        for j in range(defer + term):
+            ty = y + j
+            ok = ty < T
+            grown = amount * (1 + r) ** j
+            if j >= defer:
+                n = j - defer + 1
+                paid = pay * (((1 + r) ** n - 1) / r if r else n)
+            else:
+                paid = 0.0
+            bal = np.maximum(grown - paid, 0.0)
+            np.add.at(debt, (rows[ok], ty[ok] + 1), bal[ok])
+
     for e in s.events:
         if e.type in ("set_amount", "scale"):
             continue
@@ -277,38 +333,85 @@ def flows(s: Scenario) -> Flows:
             np.add.at(windfalls, (rows[on], y[on]), amount[on] * (1 - e.tax_rate))
         elif e.type == "loan":
             np.add.at(loans_in, (rows[on], y[on]), amount[on])
-            # Loan rates are nominal; payments are fixed in real terms using
-            # the scenario's mean inflation (a transparent approximation).
-            r = (1 + e.rate) / (1 + s.inflation.mean) - 1
-            pay = loan_payment(amount, r, e.defer, e.term)
-            for k in range(e.term):
-                ty = y + e.defer + k
-                ok = ty < T
-                np.add.at(loan_payments, (rows[ok], ty[ok]), pay[ok])
-            # Balance owed at the end of each year after disbursement: grows
-            # with interest, falls with each payment, reaches 0 after the last.
-            for j in range(e.defer + e.term):
-                ty = y + j
-                ok = ty < T
-                grown = amount * (1 + r) ** j
-                if j >= e.defer:
-                    n = j - e.defer + 1
-                    paid = pay * (((1 + r) ** n - 1) / r if r else n)
-                else:
-                    paid = 0.0
-                bal = np.maximum(grown - paid, 0.0)
-                np.add.at(debt, (rows[ok], ty[ok] + 1), bal[ok])
+            add_loan(amount, e.rate, e.defer, e.term, y)
+        elif e.type == "home":
+            # Down payment and ~2% closing costs in cash; the rest is a
+            # mortgage paid to the seller (no cash in), repaid like a loan.
+            np.add.at(purchases, (rows[on], y[on]), (amount * (e.down + 0.02))[on])
+            if e.down < 1:
+                add_loan(amount * (1 - e.down), e.rate, 0, e.term, y)
+            g = e.appreciation.mean + e.appreciation.stdev * draws.standard_normal(
+                s.seed, P, T, "home", e.name)
+            value = np.zeros(P)
+            for j in range(T):
+                owned = on & (j >= y)
+                value = np.where(j == y, amount, value * (1 + np.where(owned, g[:, j], 0.0)))
+                value = np.where(owned, value, 0.0)
+                home[:, j + 1] += value
+                home_costs[:, j] += np.where(owned, amount * e.owner_costs, 0.0)
     return Flows(income, {st.name: st.taxable for st in s.income},
                  {st.name: st.spendable for st in s.income}, expenses, off, hours,
-                 purchases, windfalls, loans_in, loan_payments, debt)
+                 purchases, windfalls, loans_in, loan_payments, debt, home_costs, home)
+
+
+def stock_share(s: Scenario) -> np.ndarray | None:
+    """Stock share by year from the glide path, or None (all in returns)."""
+    if not s.allocation:
+        return None
+    pts = sorted(s.allocation)
+    return np.interp(np.arange(s.horizon_years), [y for y, _ in pts], [x for _, x in pts])
+
+
+def market_returns(s: Scenario) -> tuple[np.ndarray, np.ndarray | None]:
+    """Real portfolio returns and real cash returns, each (paths, years).
+
+    Stress tests add to stock returns and inflation in their years. With a
+    glide path, the portfolio blends stocks with bonds correlated to them.
+    """
+    P, T = s.paths, s.horizon_years
+    nominal, infl = draws.market(s.returns, s.inflation, s.seed, P, T)
+    stock, infl = nominal.copy(), infl.copy()
+    for y, dr, di in s.stress:
+        if 0 <= y < T:
+            stock[:, y] += dr
+            infl[:, y] += di
+    port = stock
+    share = stock_share(s)
+    if share is not None and s.bonds is not None:
+        sd = s.returns.stdev if s.returns.stdev > 0 else 1.0
+        z = (nominal - s.returns.mean) / sd
+        e = draws.standard_normal(s.seed, P, T, "market", "bonds")
+        rho = s.bonds.correlation
+        bond = s.bonds.mean + s.bonds.stdev * (rho * z + np.sqrt(1 - rho**2) * e)
+        port = share * stock + (1 - share) * bond
+    real = (1.0 + np.maximum(port, -0.99)) / (1.0 + infl) - 1.0
+    cash = None
+    if s.cash is not None:
+        cn = s.cash.mean + s.cash.stdev * draws.standard_normal(s.seed, P, T, "market", "cash")
+        cash = (1.0 + np.maximum(cn, -0.5)) / (1.0 + infl) - 1.0
+    return real, cash
 
 
 def real_returns(s: Scenario) -> np.ndarray:
-    nominal, infl = draws.market(s.returns, s.inflation, s.seed, s.paths, s.horizon_years)
-    return (1.0 + nominal) / (1.0 + infl) - 1.0
+    return market_returns(s)[0]
+
+
+def reserve_months(s: Scenario) -> tuple[np.ndarray, np.ndarray]:
+    """Months of spending to hold in cash each year, and the runway years."""
+    T = s.horizon_years
+    months = np.zeros(T)
+    runway = np.zeros(T, dtype=bool)
+    if s.cash is not None:
+        months[:] = s.cash.reserve_months
+        if s.cash.runway_window and s.cash.runway_months > 0:
+            a, b = s.cash.runway_window
+            runway[max(a, 0):max(min(b, T), 0)] = True
+            months[runway] = s.cash.runway_months
+    return months, runway
 
 
 CREEP = "Lifestyle creep"
+COAST = "Coast spending (not saved)"
 
 
 def _layer_tax(amount: np.ndarray, layer: TaxLayer) -> np.ndarray:
@@ -317,8 +420,9 @@ def _layer_tax(amount: np.ndarray, layer: TaxLayer) -> np.ndarray:
 
 def simulate(s: Scenario) -> Result:
     P, T = s.paths, s.horizon_years
-    r = real_returns(s)
+    r, rc = market_returns(s)
     F = flows(s)
+    months, runway = reserve_months(s)
     ls = s.lifestyle
     cats = ls.categories if ls and ls.tiers else ()
     st = s.strategy if s.strategy and s.strategy.kind != "work" else None
@@ -329,7 +433,7 @@ def simulate(s: Scenario) -> Result:
     for name, a in F.expenses.items():
         if name not in cats:
             fixed_spend += a
-    events_net = F.windfalls + F.loans_in - F.purchases - F.loan_payments
+    events_net = F.windfalls + F.loans_in - F.purchases - F.loan_payments - F.home_costs
     hours_base = sum(F.hours.values()) if F.hours else np.zeros((P, T))
     hours_stop = sum((a for n, a in F.hours.items() if n in stop), np.zeros((P, T)))
 
@@ -343,8 +447,14 @@ def simulate(s: Scenario) -> Result:
             any_on |= ~F.off[c]
 
     # Outputs filled year by year.
-    W = np.empty((P, T + 1))
+    W = np.empty((P, T + 1))  # invested
     W[:, 0] = s.starting_balance
+    C = np.zeros((P, T + 1))  # cash reserve (never negative)
+    if s.cash is not None:
+        C[:, 0] = s.cash.balance
+    coast_spend = np.zeros((P, T))
+    coasting = np.zeros(P, dtype=bool)  # true Coast FIRE: stopped saving
+    stop_saving = st is not None and st.kind == "coast" and st.coast_mode == "stop_saving"
     net = np.empty((P, T))
     take_home = np.empty((P, T))
     income_total = np.empty((P, T))
@@ -363,7 +473,7 @@ def simulate(s: Scenario) -> Result:
     peak_spend = np.zeros(P)  # strategies plan around the most you have spent so far
 
     for t in range(T):
-        w = W[:, t]
+        w = W[:, t] + C[:, t]  # liquid assets
         # Income this year, with the strategy applied to the "stop" streams.
         inc_t = np.zeros(P)
         taxable_t = np.zeros(P)
@@ -417,24 +527,53 @@ def simulate(s: Scenario) -> Result:
             creep[:, t] = np.where((k > 0) & any_on[:, t], ls.creep * np.maximum(above, 0.0), 0.0)
             c_t -= creep[:, t]
             spent += creep[:, t]
+        if stop_saving:
+            extra = np.where(coasting, np.maximum(c_t, 0.0), 0.0)
+            coast_spend[:, t] = extra
+            c_t = c_t - extra
+            spent = spent + extra
         net[:, t] = c_t
-        growth = np.where(w >= 0, 1.0 + r[:, t], 1.0 + s.borrowing_rate)
-        W[:, t + 1] = w * growth + c_t
+        inv = W[:, t]
+        inv_g = inv * np.where(inv >= 0, 1.0 + r[:, t], 1.0 + s.borrowing_rate)
+        if s.cash is None:
+            W[:, t + 1] = inv_g + c_t
+        else:
+            cash = C[:, t] * (1.0 + rc[:, t])
+            target = months[t] / 12.0 * spent
+            gap = np.maximum(target - cash, 0.0)
+            to_cash = np.where(c_t > 0, np.minimum(c_t, gap), 0.0)
+            from_cash = np.where(c_t < 0, np.minimum(-c_t, cash), 0.0)
+            cash = cash + to_cash - from_cash
+            inv_g = inv_g + c_t - to_cash + from_cash
+            if runway[t]:
+                # Building or living on a runway: sell investments to fill it.
+                top = np.minimum(np.maximum(target - cash, 0.0), np.maximum(inv_g, 0.0))
+            else:
+                # Otherwise excess cash above the reserve is invested.
+                top = -np.maximum(cash - target, 0.0)
+            W[:, t + 1] = inv_g - top
+            C[:, t + 1] = cash + top
 
         # Strategy: decide for next year from the year-end portfolio.
         peak_spend = np.maximum(peak_spend, spent)
         yrs = st.target_year - (t + 1) if st is not None else 0
         if st is not None and t + 1 >= st.min_year and yrs > 0:
             target = st.multiple * peak_spend
+            liquid = W[:, t + 1] + C[:, t + 1]
             if st.kind == "fire":
-                hit = (factor > 0) & (W[:, t + 1] >= target)
+                hit = (factor > 0) & (liquid >= target)
                 factor = np.where(hit, 0.0, factor)
-            else:  # coast
+            elif stop_saving:
                 need = target / (1 + st.expected_real_return) ** yrs
-                hit = (factor == 1.0) & (W[:, t + 1] >= need)
+                hit = ~coasting & (liquid >= need)
+                coasting |= hit
+            else:  # coast, reduced pay and hours
+                need = target / (1 + st.expected_real_return) ** yrs
+                hit = (factor == 1.0) & (liquid >= need)
                 factor = np.where(hit, st.coast_factor, factor)
             fire_year = np.where(hit & (fire_year < 0), t + 1, fire_year)
 
+    W = W + C  # the portfolio reported everywhere is all liquid assets
     below = W[:, 1:] < s.failure_floor
     failed = below.any(axis=1)
     first = np.where(failed, below.argmax(axis=1), -1)
@@ -443,6 +582,8 @@ def simulate(s: Scenario) -> Result:
     out_spend.update(spend)
     if cats:
         out_spend[CREEP] = creep
+    if stop_saving:
+        out_spend[COAST] = coast_spend
     spending = sum(out_spend.values()) if out_spend else np.zeros((P, T))
     means = {
         "income": inc_means,
@@ -451,14 +592,17 @@ def simulate(s: Scenario) -> Result:
         "other": {"One-time purchases": F.purchases.mean(axis=0),
                   "Loan payments": F.loan_payments.mean(axis=0),
                   "Windfalls (after tax)": F.windfalls.mean(axis=0),
-                  "Loans received": F.loans_in.mean(axis=0)},
+                  "Loans received": F.loans_in.mean(axis=0),
+                  "Home costs": F.home_costs.mean(axis=0)},
         "saved": net.mean(axis=0),
     }
-    return Result(s, W - F.debt, net, r, failed, first, income_total, tax_total,
+    return Result(s, W + F.home - F.debt, net, r, failed, first, income_total, tax_total,
                   take_home=take_home, spending=spending,
                   tier=tier if cats else None, affordable=afford, flow_means=means,
                   portfolio=W, debt=F.debt, hours=hours if s.time else None,
-                  strategy_year=fire_year if st else None)
+                  strategy_year=fire_year if st else None,
+                  cash=C if s.cash is not None else None,
+                  home=F.home if F.home.any() else None)
 
 
 def cash_flows(s: Scenario) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

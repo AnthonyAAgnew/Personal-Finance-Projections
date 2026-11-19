@@ -6,7 +6,7 @@ strategy:
   name: Barista FIRE
   kind: coast
   multiple: 25
-  min_year: 5             # start checking 3 years into the career
+  min_year: 7             # start checking 3 years into the career
   coast_factor: 0.25
   expected_real_return: 0.045
   target_year: 43

@@ -180,5 +180,5 @@ def test_cardiology_ep_ladder_reaches_ep_pay_on_some_paths():
 def test_industry_then_founder_has_unpaid_runway():
     s = compose(PROFILE, ROOT / "careers" / "industry_then_founder.yaml", paths=2000)
     res = simulate(s)
-    assert np.mean(res.income[:, 3] > 100_000) > 0.95     # still in industry
-    assert np.mean(res.income[:, 7] < 50_000) > 0.6        # bootstrapping, living off savings
+    assert np.mean(res.income[:, 5] > 100_000) > 0.95     # still in industry
+    assert np.mean(res.income[:, 9] < 50_000) > 0.6        # bootstrapping, living off savings

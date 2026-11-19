@@ -1,6 +1,6 @@
 name: Remote work abroad (rural Italy / Spain)
 description: >
-  Around age 26, move to a cheaper country (rural Italy or Spain) and keep
+  Around age 28, move to a cheaper country (rural Italy or Spain) and keep
   working remotely for a US employer. Only realistic for remote-friendly
   careers (data, AI, patent prosecution, some quant and design roles), not
   for clinical, lab, sales or regulator jobs.
@@ -16,10 +16,10 @@ assumptions:
   - "To model China or another country, copy this file and change the cost index and pay factor."
 
 lifestyle:
-  cost_index: [[4, 0.6]]
+  cost_index: [[6, 0.6]]
 
 events:
-  - {name: Move abroad, type: scale, target: Career pay, factor: 0.85, year: 4}
+  - {name: Move abroad, type: scale, target: Career pay, factor: 0.85, year: 6}
   - {name: Moving and visa costs, type: purchase, amount: 25000, same_time_as: Move abroad}
   - name: Cheaper living abroad
     type: scale

@@ -62,5 +62,5 @@ def test_scores_rank_careers_and_respect_weights():
 def test_low_pay_years_count_training():
     md = simulate(compose(PROFILE, ROOT / "careers" / "cardiology_ep.yaml", paths=2000))
     rd = simulate(compose(PROFILE, ROOT / "careers" / "rd_engineer.yaml", paths=2000))
-    assert criteria_values(rd)["training"] == 2                # just the Ph.D.
+    assert criteria_values(rd)["training"] == 4                # just the Ph.D.
     assert criteria_values(md)["training"] > 6                 # school, residency, fellowship

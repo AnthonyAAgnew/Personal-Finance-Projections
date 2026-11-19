@@ -6,21 +6,21 @@ sources:
   - "Texas has no state personal income tax (Texas Comptroller)"
 
 assumptions:
-  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 2)."
+  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 4)."
   - "Pay about 8% below Irvine (CHECK)."
   - "Rent about 25% lower, other costs 8% lower; tiers cost 20% less (CHECK)."
   - "No state income tax or state payroll tax."
   - "Careers already tied to a place (FDA in Maryland, quant finance in New York) get this adjustment on top of their own; treat those combinations loosely."
 
 lifestyle:
-  cost_index: [[2, 0.8]]
+  cost_index: [[4, 0.8]]
 
 taxes:
   - {name: California income tax, remove: true}
   - {name: California SDI, remove: true}
 
 events:
-  - {name: Move to Texas (Austin / Dallas), type: scale, target: Career pay, factor: 0.92, year: 2}
+  - {name: Move to Texas (Austin / Dallas), type: scale, target: Career pay, factor: 0.92, year: 4}
   - {name: Moving costs, type: purchase, amount: 10000, same_time_as: Move to Texas (Austin / Dallas)}
   - {name: Rent there, type: scale, target: Housing, factor: 0.75, same_time_as: Move to Texas (Austin / Dallas)}
   - {name: Other costs there, type: scale, target: [Food, Transport, Health & insurance, Utilities & phone, Fun & dining, Travel, Shopping & other], factor: 0.92, same_time_as: Move to Texas (Austin / Dallas)}

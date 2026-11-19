@@ -12,5 +12,5 @@ strategy:
   name: Lean FIRE
   kind: fire
   multiple: 25
-  min_year: 5             # start checking 3 years into the career
+  min_year: 7             # start checking 3 years into the career
   stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

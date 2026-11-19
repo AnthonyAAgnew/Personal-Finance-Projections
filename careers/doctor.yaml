@@ -17,7 +17,7 @@ sources:
   - "Medscape 2026 report via Advisory Board: primary care average $298k, specialists $417k: https://www.advisory.com/daily-briefing/2026/06/04/physician-compensation"
 
 assumptions:
-  - "Applies during year 2 (right after the Ph.D.) while working as an R&D engineer ($150k)."
+  - "Applies during year 4 (right after the Ph.D.) while working as an R&D engineer ($150k)."
   - "60% chance of admission (CHECK). National acceptance is about 40%; a Ph.D. applicant is usually stronger, but this is a guess."
   - "Cost of attendance $75,654/yr covers tuition and living, so your normal budget categories pause during school."
   - "All 4 years of cost borrowed at a blended 8.5% nominal (federal direct plus private). New 2026 federal caps limit professional students to $50k/yr, so part of this is likely private. Repaid over 10 years, starting once residency ends."
@@ -29,7 +29,7 @@ assumptions:
 income:
   - name: Career pay
     amount: 150000
-    start_year: 2
+    start_year: 4
     growth: {mean: 0.005, stdev: 0.03}   # physician pay has roughly tracked inflation
     noise: 0.05
     loss_probability: 0.02
@@ -37,14 +37,14 @@ income:
     taxable: true
 
 time:
-  - {name: Work hours, amount: 44, start_year: 2}
+  - {name: Work hours, amount: 44, start_year: 4}
 
 events:
   - name: Admitted to med school
     type: set_amount
     target: Career pay
     amount: 0
-    year: 3
+    year: 5
     duration: 4
     probability: 0.6
   - name: School covers living costs
@@ -69,6 +69,7 @@ events:
     same_time_as: Admitted to med school
     offset: 4
   - name: Attending (primary care)
+    confidence: medium
     type: set_amount
     target: Career pay
     amount: 298000
@@ -77,6 +78,7 @@ events:
     group: specialty
     probability: 0.6
   - name: Attending (specialist)
+    confidence: medium
     type: set_amount
     target: Career pay
     amount: 417000

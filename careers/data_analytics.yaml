@@ -12,21 +12,21 @@ sources:
 
 assumptions:
   - "Senior data scientist at ~$150k (CHECK: the BLS median for data scientists was not returned by search; a Ph.D. plus an M.S. in Statistics usually starts above the median)."
-  - "Staff level around age 31 (~$185k); 30% reach principal or manager (~$230k) around age 35. CHECK"
+  - "Staff level around age 33 (~$185k); 30% reach principal or manager (~$230k) around age 37. CHECK"
   - "4% yearly layoff risk."
   - "Hours: 44/week (engineering survey averages; no data-science-specific survey found, CHECK)."
   - "Autonomy 76 (Data Scientists). Burnout and satisfaction from the Jellyfish engineering survey (CHECK)."
 
 income:
-  - {name: Career pay, amount: 150000, start_year: 2, growth: {mean: 0.01, stdev: 0.03}, noise: 0.06, loss_probability: 0.04, loss_fraction: 0.4, taxable: true}
-  - {name: Employer 401(k) match, amount: 8000, start_year: 2, end_year: 43, spendable: false}
+  - {name: Career pay, amount: 150000, start_year: 4, growth: {mean: 0.01, stdev: 0.03}, noise: 0.06, loss_probability: 0.04, loss_fraction: 0.4, taxable: true, confidence: medium}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 4, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 44, start_year: 2}
+  - {name: Work hours, amount: 44, start_year: 4}
 
 events:
-  - {name: Staff data scientist, type: set_amount, target: Career pay, amount: 185000, year: 7, jitter: 1}
-  - {name: Principal or manager, type: set_amount, target: Career pay, amount: 230000, year: 11, jitter: 2, probability: 0.3}
+  - {name: Staff data scientist, type: set_amount, target: Career pay, amount: 185000, year: 9, jitter: 1}
+  - {name: Principal or manager, type: set_amount, target: Career pay, amount: 230000, year: 13, jitter: 2, probability: 0.3, confidence: low}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 76, satisfaction: 0.75, burnout: 0.46}

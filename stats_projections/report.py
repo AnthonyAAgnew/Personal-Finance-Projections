@@ -464,3 +464,97 @@ def plot(results: list[Result], path: str | Path) -> Path:
     fig.savefig(path, dpi=130)
     plt.close(fig)
     return path
+
+
+# ----------------------------------------------------------------------------
+# Failure types, startup runway, free time
+# ----------------------------------------------------------------------------
+
+FAILURE_MODES = {
+    "crunch": "Cash crunch: liquid assets below the floor at any point",
+    "insolvent": "Negative net worth (loans exceed assets) at 40 or later",
+    "retirement": "Runs out in retirement: liquid assets below the floor after 65",
+}
+
+
+def failure_modes(res: Result, insolvency_age: int = 40, retire_age: int = 65) -> dict:
+    """Per path flags and first-failure years for three different failures.
+
+    * crunch: the portfolio (cash + investments) drops below the floor, even
+      briefly, e.g. a job gap or a down payment. This is ``res.failed``.
+    * insolvent: net worth (including home equity and loans) is below 0 at or
+      after ``insolvency_age``, after school and training should be over.
+    * retirement: the portfolio drops below the floor at or after
+      ``retire_age``: the classic "money ran out" outcome.
+    """
+    s = res.scenario
+    a0 = s.start_age or 0
+    ages = a0 + 1 + np.arange(s.horizon_years)
+    liquid = res.portfolio[:, 1:] if res.portfolio is not None else res.net_worth[:, 1:]
+    below = liquid < s.failure_floor
+    masks = {
+        "crunch": below,
+        "insolvent": (res.net_worth[:, 1:] < 0) & (ages >= insolvency_age),
+        "retirement": below & (ages >= retire_age),
+    }
+    out = {}
+    for k, m in masks.items():
+        ever = m.any(axis=1)
+        out[k] = {"p": float(ever.mean()), "cumulative": np.cumsum(m, axis=1).astype(bool).mean(axis=0)}
+    return out
+
+
+def runway_metrics(res: Result) -> dict | None:
+    """How a startup runway held up: None unless the career has a runway window."""
+    s = res.scenario
+    if s.cash is None or not s.cash.runway_window or res.cash is None:
+        return None
+    a, b = s.cash.runway_window
+    b = min(b, s.horizon_years)
+    if b <= a:
+        return None
+    cash = res.cash[:, a + 1:b + 1]
+    liquid = res.portfolio[:, a + 1:b + 1]
+    return {
+        "window": (a, b),
+        "cash_at_start": float(np.median(res.cash[:, a])),
+        "peak_cash": float(np.median(res.cash[:, a:b + 1].max(axis=1))),
+        "p_cash_out": float((cash < 1.0).any(axis=1).mean()),
+        "p_broke": float((liquid < s.failure_floor).any(axis=1).mean()),
+    }
+
+
+AWAKE_HOURS_PER_WEEK = 16 * 7
+COMMUTE_HOURS_PER_WEEK = 4.5  # Census ACS: ~27 minutes each way, 5 days a week
+
+
+@dataclass(frozen=True)
+class FreeTime:
+    name: str
+    lifetime_free: float  # waking hours not spent working or commuting, now to the plan's end
+    free_before_65: float
+    working_years: float
+    retired_years: float
+    free_share: float  # free hours / waking hours over the whole plan
+
+
+def free_time(res: Result, commute: float = COMMUTE_HOURS_PER_WEEK,
+              retire_age: int = 65) -> FreeTime | None:
+    """Waking hours left after work and commuting (vacation weeks count as free)."""
+    if res.hours is None:
+        return None
+    s = res.scenario
+    a0 = s.start_age or 0
+    h = res.hours
+    working = h > 0
+    busy = (h + np.where(working, commute, 0.0)) * WEEKS_PER_YEAR
+    free = AWAKE_HOURS_PER_WEEK * 52 - busy
+    ages = a0 + np.arange(s.horizon_years)
+    return FreeTime(
+        name=s.name,
+        lifetime_free=float(np.median(free.sum(axis=1))),
+        free_before_65=float(np.median(free[:, ages < retire_age].sum(axis=1))),
+        working_years=float(np.median(working.sum(axis=1))),
+        retired_years=float(np.median((~working & (ages >= a0 + 4)).sum(axis=1))),
+        free_share=float(np.median(free.sum(axis=1)) / (AWAKE_HOURS_PER_WEEK * 52 * s.horizon_years)),
+    )

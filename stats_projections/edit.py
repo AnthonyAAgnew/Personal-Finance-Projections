@@ -13,11 +13,13 @@ from typing import Any
 from .config import Event, Scenario, Stream
 
 _STREAM_DEFAULTS = {"start_year": 0, "end_year": None, "loss_probability": 0.0,
-                    "loss_fraction": 1.0, "noise": 0.0, "taxable": False, "spendable": True}
+                    "loss_fraction": 1.0, "noise": 0.0, "taxable": False, "spendable": True,
+                    "confidence": "high"}
 _EVENT_DEFAULTS = {"year": 0, "amount": 0.0, "target": None, "jitter": 0,
                    "same_time_as": None, "offset": 0, "probability": 1.0, "group": None,
                    "spread": 0.0, "tax_rate": 0.0, "duration": None, "rate": 0.0,
-                   "term": 10, "defer": 0, "factor": 1.0}
+                   "term": 10, "defer": 0, "factor": 1.0, "confidence": "high",
+                   "equity": None, "down": 0.2, "owner_costs": 0.0}
 
 
 def _clean(d: dict, defaults: dict) -> dict:
@@ -33,6 +35,10 @@ def stream_to_dict(s: Stream) -> dict:
 
 def event_to_dict(e: Event) -> dict:
     d = _clean(asdict(e), _EVENT_DEFAULTS)
+    if d.get("appreciation") == {"mean": 0.0, "stdev": 0.0}:
+        del d["appreciation"]
+    if d.get("equity"):
+        d["equity"]["dilution"] = list(d["equity"]["dilution"])
     if e.same_time_as:
         d.pop("year", None)  # the year comes from the linked event
     elif "year" not in d:
@@ -64,6 +70,19 @@ def to_dict(s: Scenario) -> dict:
         "expenses": [stream_to_dict(x) for x in s.expenses],
         "events": [event_to_dict(e) for e in s.events],
     }
+    if s.cash is not None:
+        c = asdict(s.cash)
+        if c["runway_window"] is not None:
+            c["runway_window"] = list(c["runway_window"])
+        else:
+            del c["runway_window"]
+        out["portfolio"]["cash"] = c
+    if s.bonds is not None:
+        out["portfolio"]["bonds"] = asdict(s.bonds)
+    if s.allocation:
+        out["portfolio"]["allocation"] = [list(x) for x in s.allocation]
+    if s.stress:
+        out["portfolio"]["stress"] = [list(x) for x in s.stress]
     if out["start_age"] is None:
         del out["start_age"]
     if s.taxes:

@@ -1,0 +1,18 @@
+name: Coast FIRE (stop saving)
+description: >
+  The standard Coast FIRE: once what you have would grow to 25x spending by
+  65 with no further contributions, stop saving. You keep working the same job
+  and hours, and every dollar beyond your budget is spent instead of saved.
+  Savings resume only at retirement, when you draw on the portfolio.
+assumptions:
+  - "Coast number uses a 4.5% real return. The portfolio's own blended return falls along the glide path, so coasting can fall short if markets or the glide path underperform."
+  - "After coasting, the extra spending shows in the budget as 'Coast spending (not saved)'. Employer matches stop with your contributions."
+strategy:
+  name: Coast FIRE (stop saving)
+  kind: coast
+  coast_mode: stop_saving
+  multiple: 25
+  min_year: 7
+  expected_real_return: 0.045
+  target_year: 43
+  stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]
