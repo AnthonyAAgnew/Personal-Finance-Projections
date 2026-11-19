@@ -4,32 +4,41 @@ description: >
   tenure-track BME faculty job for a minority, industry for the rest.
 
 sources:
+  - "Hours: NSF (2003) postdocs average 50.3 hrs/week; Nature postdoc survey: over half work 50+, a quarter 60+: https://blogs.nature.com/naturejobs/2011/04/01/are-long-working-hours-inevitable-for-postdocs/"
+  - "Hours: Iowa Board of Regents faculty activity report: faculty average 53.4 hrs/week, tenure-track 4-6 hours more than non-tenure-track: https://iowaregents.edu/news/newsletter/board-of-regents-news/november-2021-meeting-preview/faculty-activities-at-iowas-public-universities"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: 2024 faculty surveys: 64% feel burned out to some degree (HMS), 41% report burnout (WGU Labs): https://www.ecampusnews.com/campus-leadership/2024/02/27/faculty-burnout-is-at-an-all-time-high/"
+  - "Satisfaction: Nature 2023 postdoc survey: career dissatisfaction 24% on a first postdoc, 34% by the third or fourth: https://www.nature.com/naturecareers/article/nature-2023-postdoc-survey"
   - "NIH NRSA FY2025 postdoctoral stipends: $62,232 (year 0) to $75,564 (7+): https://www.niaid.nih.gov/grants-contracts/salary-cap-stipends"
 
 assumptions:
   - "3-5 year postdoc starting at $62,232, rising ~2%/yr with NRSA steps."
-  - "25% land a tenure-track job around age 35 (CHECK: commonly cited rates are 10-25%); the rest move to industry R&D at ~$140k, a little behind having gone straight to industry."
+  - "25% land a tenure-track job around age 28 (CHECK: commonly cited rates are 10-25%); the rest move to industry R&D at ~$140k, a little behind having gone straight to industry."
   - "Assistant professor ~$125k including summer salary (CHECK: no source found for BME assistant professor pay); 80% earn tenure 6 years later (~$150k), then 60% reach full professor (~$190k)."
   - "Denied tenure (20%): move to industry at ~$150k."
-  - "Hours: postdoc ~55, assistant professor ~60, tenured ~55, full professor ~52, industry ~47. CHECK"
+  - "Hours: postdoc 51 (NSF 50.3), assistant professor 58 (tenure-track runs 4-6 above the 53.4 faculty average), tenured 54, full professor 52, industry 44."
+  - "Autonomy 95 (Biological Science Teachers, Postsecondary: 99; postdocs have less). Burnout 52% (midpoint of 2024 faculty surveys, 41-64%). Satisfaction 68% (Nature 2023 postdocs: 24-34% dissatisfied)."
 
 income:
   - {name: Career pay, amount: 62232, start_year: 2, growth: {mean: 0.02, stdev: 0.01}, taxable: true}
-  - {name: Employer 401(k) match, amount: 0, start_year: 2, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 0, start_year: 2, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 55, start_year: 2}
+  - {name: Work hours, amount: 51, start_year: 2}
 
 events:
   - {name: Tenure-track job, type: set_amount, target: Career pay, amount: 125000, year: 6, jitter: 1, group: market, probability: 0.25}
   - {name: Leaves for industry, type: set_amount, target: Career pay, amount: 140000, year: 6, jitter: 1, group: market, probability: 0.75}
   - {name: Industry match, type: set_amount, target: Employer 401(k) match, amount: 8400, same_time_as: Leaves for industry}
   - {name: University retirement match, type: set_amount, target: Employer 401(k) match, amount: 10000, same_time_as: Tenure-track job}
-  - {name: Assistant professor hours, type: set_amount, target: Work hours, amount: 60, same_time_as: Tenure-track job}
-  - {name: Industry hours (after postdoc), type: set_amount, target: Work hours, amount: 47, same_time_as: Leaves for industry}
+  - {name: Assistant professor hours, type: set_amount, target: Work hours, amount: 58, same_time_as: Tenure-track job}
+  - {name: Industry hours (after postdoc), type: set_amount, target: Work hours, amount: 44, same_time_as: Leaves for industry}
   - {name: Earns tenure, type: set_amount, target: Career pay, amount: 150000, same_time_as: Tenure-track job, offset: 6, group: tenure, probability: 0.8}
   - {name: Denied tenure, type: set_amount, target: Career pay, amount: 150000, same_time_as: Tenure-track job, offset: 6, group: tenure, probability: 0.2}
-  - {name: Tenured hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Earns tenure}
-  - {name: Industry hours (after tenure denial), type: set_amount, target: Work hours, amount: 47, same_time_as: Denied tenure}
+  - {name: Tenured hours, type: set_amount, target: Work hours, amount: 54, same_time_as: Earns tenure}
+  - {name: Industry hours (after tenure denial), type: set_amount, target: Work hours, amount: 44, same_time_as: Denied tenure}
   - {name: Full professor, type: set_amount, target: Career pay, amount: 190000, same_time_as: Earns tenure, offset: 6, jitter: 1, probability: 0.6}
   - {name: Full professor hours, type: set_amount, target: Work hours, amount: 52, same_time_as: Full professor}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 95, satisfaction: 0.68, burnout: 0.52}

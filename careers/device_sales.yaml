@@ -5,16 +5,21 @@ description: >
   big commission swings and quota-driven job risk.
 
 sources:
+  - "Hours: Repertoire 2015 medical rep survey: most reps spend 31-50 hrs/week in the field plus 11-20 on admin: https://repertoiremag.com/rep-survey-reveals-morale-is-high.html"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Satisfaction: MedReps 2016 survey: 72% of medical sales reps satisfied or very satisfied: https://www.biospace.com/report-reveals-medical-sales-rep-satisfaction-up-43-percent-from-2013"
   - "MedReps salary report coverage: total comp ~$141k-$150k, base ~$93k-$95k plus ~$61k-$63k commission (secondary sources; verify on medreps.com)"
   - "MedReps 2017 survey (2,854 reps): average $147,424 total, $95,791 base: https://www.prweb.com/releases/2017/05/prweb14373304.htm"
   - "Medical device sales compensation structures: https://www.everstage.com/sales-compensation/medical-device-sales-compensation"
 
 assumptions:
   - "Years 1-2 as a clinical specialist / associate rep: ~$100k total."
-  - "Own territory around age 34 (±1): ~$155k total, slightly above the all-medical-sales average because device reps earn more."
-  - "25% chance of becoming a top performer (~$260k) around age 38; the rest stay near average."
+  - "Own territory around age 27 (±1): ~$155k total, slightly above the all-medical-sales average because device reps earn more."
+  - "25% chance of becoming a top performer (~$260k) around age 31; the rest stay near average."
   - "Commission swings ±20% a year (noise 0.20). 6% yearly chance of losing the job or territory (half a year's pay lost)."
   - "Employer 401(k) match about 6% of base."
+  - "Hours: 52/week including travel, case coverage and admin (Repertoire 2015 field plus admin hours; O*NET: 79% of reps work 40+)."
+  - "Autonomy 82 (Technical and Scientific Products sales reps). Satisfaction 72% (MedReps 2016). Burnout 50% (CHECK: no rep-specific survey found)."
 
 income:
   - name: Career pay
@@ -29,12 +34,11 @@ income:
     spendable: false            # goes straight into savings
     amount: 5700
     start_year: 2
-    end_year: 36
+    end_year: 43
     growth: {mean: 0.015, stdev: 0.0}
 
-# Hours per week incl. travel and case coverage: ~52, easing with seniority. CHECK
 time:
-  - {name: Work hours, amount: 52, start_year: 2, growth: {mean: -0.006, stdev: 0.02}}
+  - {name: Work hours, amount: 52, start_year: 2}
 
 events:
   - name: Own territory
@@ -50,3 +54,6 @@ events:
     year: 8
     jitter: 2
     probability: 0.25
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 82, satisfaction: 0.72, burnout: 0.5}

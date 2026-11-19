@@ -4,7 +4,7 @@ description: >
   medicine residency (3), cardiology fellowship (3), then electrophysiology
   fellowship (2). Each step can fail: not admitted (stay an R&D engineer),
   no cardiology fellowship (hospitalist), or no EP fellowship (general
-  cardiologist). Full EP pay starts around age 44.
+  cardiologist). Full EP pay starts around age 37.
 
 extends: doctor.yaml
 
@@ -17,10 +17,11 @@ sources:
 assumptions:
   - "Same application year, admission chance (60%), school costs and 8.5% loans as the physician path. Loan repayment starts 3 years after school, so you repay during fellowship."
   - "Internal medicine residency 3 years at ~$68k, then a fellowship stipend of ~$78k for cardiology and EP years (PGY-4 to PGY-8). CHECK"
-  - "65% chance of a cardiology fellowship (CHECK; NRMP reports 74% across IM subspecialties, and cardiology is among the more competitive). Otherwise a hospitalist at ~$300k from age 39."
-  - "75% of cardiology fellows who want EP get an EP fellowship (CHECK). Otherwise a general cardiologist at ~$520k from age 42."
-  - "EP attending at $700k from age 44: below the MedAxiom median ($803k), since that survey leans to private programs and total pay includes call and directorships. CHECK"
-  - "Hours: about 65/week through fellowship, ~58 as an EP attending, ~57 as a general cardiologist, ~50 as a hospitalist. CHECK"
+  - "65% chance of a cardiology fellowship (CHECK; NRMP reports 74% across IM subspecialties, and cardiology is among the more competitive). Otherwise a hospitalist at ~$300k from age 32."
+  - "75% of cardiology fellows who want EP get an EP fellowship (CHECK). Otherwise a general cardiologist at ~$520k from age 35."
+  - "EP attending at $700k from age 37: below the MedAxiom median ($803k), since that survey leans to private programs and total pay includes call and directorships. CHECK"
+  - "Hours: residency 67 (AMA 2025); fellowship 62 (CHECK: between residents' 67 and trained physicians' 58); EP attending 58 (AMA 58.4); general cardiologist 56 (Medscape 56.2); hospitalist 45 (shift-based 7-on/7-off schedules, CHECK)."
+  - "Autonomy 96 (internal medicine physicians; O*NET does not list cardiologists separately). Burnout 38% (Medscape 2025 cardiology). Satisfaction 82%: between 73% for all physicians and 92% of cardiologists who would choose cardiology again (CHECK)."
 
 events:
   # The general physician outcomes are replaced by the cardiology ladder.
@@ -68,7 +69,10 @@ events:
     same_time_as: EP fellowship
     offset: 2
 
-  - {name: Fellowship hours, type: set_amount, target: Work hours, amount: 65, same_time_as: Cardiology fellowship}
-  - {name: Hospitalist hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Hospitalist (no cardiology fellowship)}
-  - {name: General cardiologist hours, type: set_amount, target: Work hours, amount: 57, same_time_as: General cardiologist}
+  - {name: Fellowship hours, type: set_amount, target: Work hours, amount: 62, same_time_as: Cardiology fellowship}
+  - {name: Hospitalist hours, type: set_amount, target: Work hours, amount: 45, same_time_as: Hospitalist (no cardiology fellowship)}
+  - {name: General cardiologist hours, type: set_amount, target: Work hours, amount: 56, same_time_as: General cardiologist}
   - {name: EP attending hours, type: set_amount, target: Work hours, amount: 58, same_time_as: EP attending}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 96, satisfaction: 0.82, burnout: 0.38}

@@ -5,20 +5,29 @@ description: >
   background plus the Ph.D. places you at a senior level.
 
 sources:
+  - "Hours: Consulting-Specifying Engineer 2024 survey: engineers average 43 hrs/week, 24% work 50+: https://www.csemag.com/how-mep-fp-engineers-are-living-a-dual-reality/"
+  - "Hours: Engineering Management Institute Future of Work report: architecture and engineering professionals average 45 hrs/week"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout and satisfaction: Jellyfish 2024 State of Engineering Management (604 respondents): 65% burned out in the past year (85% on teams under 10), 46% of engineers say their team is burned out, 75% find their work rewarding: https://jellyfish.co/blog/2024-state-of-engineering-management-report/"
   - "BLS OOH, mechanical engineers: median $102,320 (May 2024): https://www.bls.gov/OOH/architecture-and-engineering/mechanical-engineers.htm"
 
 assumptions:
   - "Senior product design engineer at ~$135k (above the BLS median given the Ph.D. and J&J years). CHECK"
-  - "Staff level around age 38 (~$170k); 25% reach principal at a top consumer-hardware company (~$230k) around age 42. CHECK"
-  - "3% yearly layoff risk; ~45 hours a week."
+  - "Staff level around age 31 (~$170k); 25% reach principal at a top consumer-hardware company (~$230k) around age 35. CHECK"
+  - "3% yearly layoff risk."
+  - "Hours: 44/week, the same engineering survey data as R&D."
+  - "Autonomy 81 (Mechanical Engineers). Burnout and satisfaction as for engineers (CHECK)."
 
 income:
   - {name: Career pay, amount: 135000, start_year: 2, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.03, loss_fraction: 0.4, taxable: true}
-  - {name: Employer 401(k) match, amount: 8000, start_year: 2, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 2, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 45, start_year: 2, growth: {mean: -0.003, stdev: 0.01}}
+  - {name: Work hours, amount: 44, start_year: 2}
 
 events:
   - {name: Staff product design engineer, type: set_amount, target: Career pay, amount: 170000, year: 7, jitter: 1}
   - {name: Principal at top hardware company, type: set_amount, target: Career pay, amount: 230000, year: 11, jitter: 2, probability: 0.25}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 81, satisfaction: 0.75, burnout: 0.46}

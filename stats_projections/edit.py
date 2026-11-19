@@ -92,6 +92,8 @@ def to_dict(s: Scenario) -> dict:
         d = asdict(s.strategy)
         d["stop"] = list(d["stop"])
         out["strategy"] = d
+    if s.quality is not None:
+        out["quality"] = {k: v for k, v in asdict(s.quality).items() if v is not None}
     return out
 
 

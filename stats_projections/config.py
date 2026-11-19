@@ -124,6 +124,22 @@ STRATEGY_KINDS = ("work", "fire", "coast")
 
 
 @dataclass(frozen=True)
+class Quality:
+    """Non-financial facts about a career, for the decision scores.
+
+    * ``autonomy``: 0-100, O*NET "Freedom to Make Decisions" (75 = some
+      freedom, 100 = a lot).
+    * ``satisfaction``: share of people in the job who are satisfied or would
+      choose it again (0-1).
+    * ``burnout``: share reporting burnout (0-1).
+    """
+
+    autonomy: float | None = None
+    satisfaction: float | None = None
+    burnout: float | None = None
+
+
+@dataclass(frozen=True)
 class Strategy:
     """A rule for when to stop (or ease off) working.
 
@@ -144,7 +160,7 @@ class Strategy:
     stop: tuple[str, ...] = ()
     coast_factor: float = 0.5
     expected_real_return: float = 0.045
-    target_year: int = 36
+    target_year: int = 43  # the profile's retirement year (age 65 from 22)
 
 
 @dataclass(frozen=True)
@@ -233,6 +249,7 @@ class Scenario:
     lifestyle: Lifestyle | None = None
     time: tuple[Stream, ...] = ()  # work hours per week (amount = hours, not dollars)
     strategy: Strategy | None = None
+    quality: Quality | None = None
     source: Path | None = field(default=None, compare=False)
 
     def stream(self, name: str) -> Stream:
@@ -472,8 +489,22 @@ def _event(data: dict) -> Event:
 TOP_KEYS = {
     "name", "description", "horizon_years", "paths", "seed", "start_age",
     "failure_floor", "borrowing_rate", "portfolio", "income", "expenses", "events",
-    "taxes", "sources", "assumptions", "lifestyle", "time", "strategy",
+    "taxes", "sources", "assumptions", "lifestyle", "time", "strategy", "quality",
 }
+
+
+def _quality(data: Any) -> Quality | None:
+    if not data:
+        return None
+    _check_keys("quality", data, set(Quality.__dataclass_fields__))
+    q = Quality(**{k: None if v is None else float(v) for k, v in data.items()})
+    if q.autonomy is not None and not 0 <= q.autonomy <= 100:
+        raise ScenarioError("quality.autonomy must be between 0 and 100")
+    for k in ("satisfaction", "burnout"):
+        v = getattr(q, k)
+        if v is not None and not 0 <= v <= 1:
+            raise ScenarioError(f"quality.{k} must be a share between 0 and 1")
+    return q
 
 
 def _strategy(data: Any) -> Strategy | None:
@@ -640,4 +671,5 @@ def from_dict(raw: dict) -> Scenario:
         lifestyle=_lifestyle(raw.get("lifestyle"), [s.name for s in expenses]),
         time=time,
         strategy=_strategy(raw.get("strategy")),
+        quality=_quality(raw.get("quality")),
     )

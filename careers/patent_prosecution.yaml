@@ -5,6 +5,9 @@ description: >
   Steady, billable-hour work; partnership is possible but not certain.
 
 sources:
+  - "Hours: Wells Fargo Legal Specialty Group via Bloomberg Law: top-100 firm lawyers billed ~1,551 hours in 2023; firm targets are 1,900-2,200 billable (Harvest): https://news.bloomberglaw.com/us-law-week/less-work-more-money-big-law-associates-never-had-it-better"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: Bloomberg Law 2024 Attorney Workload survey: attorneys burned out 42% of the time on average, mid/senior associates 51%: https://pro.bloomberglaw.com/insights/company-news/bloomberg-law-releases-attorney-workload-survey-insights-and-webinar-on-work-life-balance-solutions/"
   - "ABA Young Lawyers Division 2024 survey: median law school debt $112,500 (via Bankrate): https://bankrate.com/loans/student-loans/average-law-school-debt"
   - "Private law school tuition averages about $49k-$53k/yr in 2025-26 (aggregators citing ABA data): https://www.bestcolleges.com/research/law-school-cost/"
   - "LeanLaw citing AIPLA 2023 Economic Survey: median full-time IP attorney in private practice $270k; equity partners $420k: https://www.leanlaw.co/blog/compensation-models-for-intellectual-property-law-firms-why-your-pay-structure-might-be-your-biggest-competitive-liability/"
@@ -13,17 +16,18 @@ assumptions:
   - "Full-time JD in years 2-4 (ages 31-33) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
   - "First-year prosecution associate at ~$200k (below the $225k BigLaw scale; IP boutiques often pay less). CHECK"
-  - "Senior associate / counsel around age 38 at ~$270k (AIPLA private-practice median)."
-  - "25% chance of equity partner around age 42 at ~$420k (AIPLA equity-partner median)."
-  - "~50 billable-driven hours a week."
+  - "Senior associate / counsel around age 31 at ~$270k (AIPLA private-practice median)."
+  - "25% chance of equity partner around age 35 at ~$420k (AIPLA equity-partner median)."
+  - "Hours: 50 in law school (CHECK) and as a prosecution associate: ~1,800 billable hours plus non-billable time over 48 weeks."
+  - "Autonomy 92 (Lawyers). Burnout 42% (Bloomberg Law 2024 average). Satisfaction 62% (CHECK: Law360 2024 says most lawyers are satisfied but gives no share)."
 
 income:
   - {name: Career pay, amount: 200000, start_year: 5, growth: {mean: 0.015, stdev: 0.03}, noise: 0.05, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
   - {name: Summer associate, amount: 40000, start_year: 3, end_year: 4, taxable: true}
-  - {name: Employer 401(k) match, amount: 8000, start_year: 5, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 5, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 50, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+  - {name: Work hours, amount: 50, start_year: 2}
 
 events:
   - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 2}
@@ -34,3 +38,6 @@ events:
   - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 4}
   - {name: Senior associate / counsel, type: set_amount, target: Career pay, amount: 270000, year: 9, jitter: 1}
   - {name: Equity partner, type: set_amount, target: Career pay, amount: 420000, year: 13, jitter: 2, probability: 0.25}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 92, satisfaction: 0.62, burnout: 0.42}

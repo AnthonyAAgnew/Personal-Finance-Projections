@@ -5,6 +5,11 @@ description: >
   admitted, you stay an R&D engineer. Primary care or specialty is uncertain.
 
 sources:
+  - "Hours: AMA 2025 National Resident Comparison Report: internal medicine residents 67.3 hrs/week, physicians after training 58.4: https://www.ama-assn.org/medical-residents/residency-life/general-surgery-residents-work-average-75-hours-week"
+  - "Hours: Medscape 2023 Physician Compensation Report via Becker's: physicians average 50 hrs/week, cardiologists 56.2: https://www.beckersasc.com/uncategorized/how-many-hours-a-week-do-physicians-in-each-specialty-work/"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: Medscape 2025 Physician Burnout and Depression Report: 29% burnout only + 18% burnout and depression = 47% of physicians; cardiology 23% + 15% = 38%: https://www.beckershospitalreview.com/quality/hospital-physician-relationships/16-specialties-by-depression-burnout-rates/"
+  - "Satisfaction: Medscape: 73% of physicians would choose medicine again (92% of cardiologists would pick cardiology again, 2020): https://beckersasc.com/benchmarking/what-clinicians-would-pick-the-same-specialty-again-if-starting-over.html"
   - "JAMA Network Open (2026) via search: residents in high-burnout specialties average 65.4 hours/week"
   - "Current Population Survey analysis: doctors under 36 work 54.1 hrs/week, 36+ work 50.7"
   - "AAMC (via secondary summaries): median 2025-26 cost of attendance $75,654/yr at public MD schools; median debt $215,000 among indebted graduates: https://students-residents.aamc.org/financial-aid-resources/you-can-afford-medical-school"
@@ -18,6 +23,8 @@ assumptions:
   - "All 4 years of cost borrowed at a blended 8.5% nominal (federal direct plus private). New 2026 federal caps limit professional students to $50k/yr, so part of this is likely private. Repaid over 10 years, starting once residency ends."
   - "Residency at $68k: 3 years for primary care (60% chance) then $298k; 5 years for a specialty (40%) then $417k."
   - "Retirement still at 65. No employer retirement match is modeled (conservative)."
+  - "Hours: 44 as an engineer before school; 55 in medical school (CHECK: no national average, one school found 93% of students spend 40+); 67 in residency (AMA 2025, internal medicine); 50 for primary care (Medscape average) and 56 for specialists (Medscape cardiology 56.2; AMA's 58.4 for all trained physicians)."
+  - "Autonomy 96 (General Internal Medicine Physicians, as an attending; training years have far less). Burnout 47% (Medscape 2025). Satisfaction 73% would choose medicine again."
 
 income:
   - name: Career pay
@@ -29,10 +36,8 @@ income:
     loss_fraction: 0.4
     taxable: true
 
-# Hours per week: residents average ~65 (JAMA Netw Open 2026, high-burnout
-# specialties); attendings ~50-55 (CPS: 54 under 36, 51 after). CHECK
 time:
-  - {name: Work hours, amount: 47, start_year: 2, growth: {mean: -0.005, stdev: 0.01}}
+  - {name: Work hours, amount: 44, start_year: 2}
 
 events:
   - name: Admitted to med school
@@ -79,7 +84,10 @@ events:
     offset: 9
     group: specialty
     probability: 0.4
-  - {name: Med school hours, type: set_amount, target: Work hours, amount: 60, same_time_as: Admitted to med school}
-  - {name: Residency hours, type: set_amount, target: Work hours, amount: 70, same_time_as: Admitted to med school, offset: 4}
-  - {name: Attending hours (primary care), type: set_amount, target: Work hours, amount: 52, same_time_as: Attending (primary care)}
+  - {name: Med school hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Admitted to med school}
+  - {name: Residency hours, type: set_amount, target: Work hours, amount: 67, same_time_as: Admitted to med school, offset: 4}
+  - {name: Attending hours (primary care), type: set_amount, target: Work hours, amount: 50, same_time_as: Attending (primary care)}
   - {name: Attending hours (specialist), type: set_amount, target: Work hours, amount: 56, same_time_as: Attending (specialist)}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 96, satisfaction: 0.73, burnout: 0.47}

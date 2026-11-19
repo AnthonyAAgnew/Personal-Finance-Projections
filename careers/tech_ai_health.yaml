@@ -4,18 +4,27 @@ description: >
   company (ML scientist, applied scientist). Large stock-heavy pay, more
   layoff risk.
 
+sources:
+  - "Hours: Engineering Management Institute Future of Work report: architecture and engineering professionals average 45 hrs/week"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout and satisfaction: Jellyfish 2024 State of Engineering Management (604 respondents): 65% burned out in the past year (85% on teams under 10), 46% of engineers say their team is burned out, 75% find their work rewarding: https://jellyfish.co/blog/2024-state-of-engineering-management-report/"
+
 assumptions:
-  - "Total comp ~$230k at entry (base + bonus + RSUs), rising to ~$320k at senior/staff around age 37; 25% reach principal/director (~$450k) around age 42. CHECK: typical big-tech levels, no source found in search."
+  - "Total comp ~$230k at entry (base + bonus + RSUs), rising to ~$320k at senior/staff around age 30; 25% reach principal/director (~$450k) around age 35. CHECK: typical big-tech levels, no source found in search."
   - "Stock makes pay swing +-15% a year; 6% yearly layoff risk."
-  - "~50 hours a week, easing slightly with seniority."
+  - "Hours: 45/week (EMI's 45-hour average; big-tech norms are similar, CHECK)."
+  - "Autonomy 82 (Software Developers). Burnout 65% (Jellyfish, all software respondents); satisfaction 75%."
 
 income:
   - {name: Career pay, amount: 230000, start_year: 2, growth: {mean: 0.01, stdev: 0.04}, noise: 0.15, loss_probability: 0.06, loss_fraction: 0.4, taxable: true}
-  - {name: Employer 401(k) match, amount: 10000, start_year: 2, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 10000, start_year: 2, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 50, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+  - {name: Work hours, amount: 45, start_year: 2}
 
 events:
   - {name: Senior / staff scientist, type: set_amount, target: Career pay, amount: 320000, year: 6, jitter: 1}
   - {name: Principal / director, type: set_amount, target: Career pay, amount: 450000, year: 11, jitter: 2, probability: 0.25}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 82, satisfaction: 0.75, burnout: 0.65}

@@ -5,6 +5,10 @@ description: >
   are eventually acquired or shut down. Most of the upside is a rare exit.
 
 sources:
+  - "Hours: Antler 2025 founder survey via The Next Web: ~75% of founders work 60+ hrs/week, 19% 80+; Australian venture-backed founders average 64: https://thenextweb.com/news/european-startup-founders-work-long-hours"
+  - "Hours: Consulting-Specifying Engineer 2024 survey: engineers average 43 hrs/week, 24% work 50+: https://www.csemag.com/how-mep-fp-engineers-are-living-a-dual-reality/"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: Sifted 2025 founder survey (138 founders): 54% burned out in the past 12 months; Startup Snapshot 2023: 72% report a mental health impact: https://fortune.com/2025/09/12/we-studied-entrepreneurs-burnout-anxious-depressed-wellbeing/"
   - "Kruze Consulting startup CEO salaries 2025: seed ~$147k, Series A ~$203k: https://kruzeconsulting.com/blog/post/startup-ceo-salary-report"
   - "Citeline: VCs estimate 25-30% of device investments reach a successful exit: https://scrip.citeline.com/SC091507/Medtech-Venture-Capital-Heads-into-Unfamiliar-Terrain"
   - "PitchBook Q4 2025 analyst note: medtech takes 10+ years from founding to exit: https://files.pitchbook.com/website/files/pdf/Q4_2025_PitchBook_Analyst_Note_The_Medtech_VC_Paradox_20372.pdf"
@@ -12,12 +16,14 @@ sources:
 
 assumptions:
   - "Years 1-2: about $50k from SBIR/STTR grants or a small pre-seed round (CHECK)."
-  - "40% chance of raising seed / Series A around age 34 (±1), then a founder salary of $150k. The other 60% return to industry R&D at $150k."
+  - "40% chance of raising seed / Series A around age 27 (±1), then a founder salary of $150k. The other 60% return to industry R&D at $150k."
   - "Funded companies resolve about 5 years later (±2): 30% acquired (the upper end of VC estimates, since the 25-30% is among funded deals) and 70% shut down."
   - "Overall exit chance is therefore about 12%."
   - "Founder proceeds at exit: median $5M before tax with a wide lognormal spread (spread 1.0, so the 10th-90th percentile is about $1.4M-$18M). This assumes ~5-10% founder ownership after dilution and preferences of a ~$100-200M sale. It is the weakest number here (CHECK)."
   - "Exit proceeds taxed at a flat 20% (QSBS can remove the federal part, but California does not follow QSBS)."
   - "After an exit or shutdown you take an industry role ($200k after an exit, $165k after a shutdown). No 401(k) match is modeled."
+  - "Hours: 62 while founding (Antler: 75% of founders work 60+; Australian average 64), 60 once funded, 44 back in industry."
+  - "Autonomy 99 (Chief Executives) while founding. Burnout 54% (Sifted 2025). Satisfaction 70% (CHECK: no founder satisfaction survey found)."
 
 income:
   - name: Career pay
@@ -27,9 +33,8 @@ income:
     noise: 0.10
     taxable: true
 
-# Hours per week: ~65 while founding, ~48 after returning to industry. CHECK
 time:
-  - {name: Work hours, amount: 65, start_year: 2, growth: {mean: -0.005, stdev: 0.02}}
+  - {name: Work hours, amount: 62, start_year: 2}
 
 events:
   - name: Raises venture funding
@@ -73,6 +78,9 @@ events:
     group: outcome
     probability: 0.7
   - {name: Hours after funding, type: set_amount, target: Work hours, amount: 60, same_time_as: Raises venture funding}
-  - {name: Hours back in industry, type: set_amount, target: Work hours, amount: 48, same_time_as: Returns to industry (no funding)}
-  - {name: Hours after acquisition, type: set_amount, target: Work hours, amount: 48, same_time_as: Company acquired}
-  - {name: Hours after shutdown, type: set_amount, target: Work hours, amount: 48, same_time_as: Company shuts down}
+  - {name: Hours back in industry, type: set_amount, target: Work hours, amount: 44, same_time_as: Returns to industry (no funding)}
+  - {name: Hours after acquisition, type: set_amount, target: Work hours, amount: 44, same_time_as: Company acquired}
+  - {name: Hours after shutdown, type: set_amount, target: Work hours, amount: 44, same_time_as: Company shuts down}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 99, satisfaction: 0.7, burnout: 0.54}

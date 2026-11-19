@@ -12,5 +12,5 @@ strategy:
   min_year: 5             # start checking 3 years into the career
   coast_factor: 0.5
   expected_real_return: 0.045
-  target_year: 36
+  target_year: 43
   stop: [Career pay, Work hours, Employer 401(k) match, TSP agency match]

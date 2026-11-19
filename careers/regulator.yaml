@@ -5,18 +5,23 @@ description: >
   stable, and a defined-benefit FERS pension on top of Social Security.
 
 sources:
+  - "Hours: Gallup 2024: US full-time workers average 42.9 hrs/week; federal schedules are 40 hours with limited paid overtime"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Satisfaction: 2024 Federal Employee Viewpoint Survey: 69% governmentwide job satisfaction: https://www.fedsmith.com/2024/10/21/federal-employees-report-higher-pay-satisfaction-in-2024-fevs/"
   - "USAJOBS CDRH posting: GS-14 base $104,604-$135,987 before locality: https://www.usajobs.gov/job/784121800"
   - "FDA biomedical engineer (0858) Title 21 recruitment: Band E $163,964-$225,011: https://fda.gov/media/184577/download"
   - "OPM FERS basic annuity: 1.1% x high-3 x years when retiring at 62+ with 20+ years: https://www.opm.gov/retirement-center/fers-information/computation/"
 
 assumptions:
-  - "Starts at GS-13 with Washington-area locality, about $125k; GS-14 around age 35 (~$148k)."
-  - "60% chance of reaching GS-15 or a Title 21 band (~$175k) around age 41."
+  - "Starts at GS-13 with Washington-area locality, about $125k; GS-14 around age 28 (~$148k)."
+  - "60% chance of reaching GS-15 or a Title 21 band (~$175k) around age 34."
   - "Pay grows ~0.5%/yr in real terms on top of promotions (step increases minus raises that lag inflation)."
   - "Layoff risk is 2% a year: low, but not zero after the 2025 HHS reductions in force."
-  - "FERS pension of about $52k/yr from age 65 (1.1% x ~$160k high-3 x 30 years)."
+  - "FERS pension of about $70k/yr from age 65 (1.1% x ~$160k high-3 x 40 years, joining at 24)."
   - "TSP agency match of 5%. Housing kept the same as your profile (DC-area rent is comparable to Irvine)."
   - "If you meant a financial (forex) regulator such as the CFTC, copy this file and change the pay: CFTC uses its own higher pay scale."
+  - "Hours: 42/week, a 40-hour federal schedule plus a little overtime, close to the 42.9 average for all full-time workers."
+  - "Autonomy 67 (Regulatory Affairs Specialists). Satisfaction 69% (FEVS governmentwide). Burnout 35% (CHECK: FEVS does not report burnout)."
 
 income:
   - name: Career pay
@@ -30,16 +35,15 @@ income:
     spendable: false            # goes straight into savings
     amount: 6250
     start_year: 2
-    end_year: 36
+    end_year: 43
     growth: {mean: 0.015, stdev: 0.0}
   - name: FERS pension
-    amount: 52000
-    start_year: 36
+    amount: 70000
+    start_year: 43
     taxable: true
 
-# Hours per week: federal schedule, ~42 with little overtime. CHECK
 time:
-  - {name: Work hours, amount: 42, start_year: 2, growth: {mean: -0.002, stdev: 0.005}}
+  - {name: Work hours, amount: 42, start_year: 2}
 
 events:
   - name: Promotion to GS-14
@@ -55,3 +59,6 @@ events:
     year: 11
     jitter: 2
     probability: 0.6
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 67, satisfaction: 0.69, burnout: 0.35}

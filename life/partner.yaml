@@ -1,6 +1,6 @@
 name: Partner (dual income)
 description: >
-  Marry or move in with a working partner around age 33 (+-2). Adds their
+  Marry or move in with a working partner around age 30 (+-2). Adds their
   income, their personal spending, a wedding, joint tax filing, and their
   Social Security. Household budget tiers then use combined take-home.
 
@@ -14,13 +14,13 @@ include: ../data/taxes_ca_mfj.yaml
 
 income:
   - {name: Partner pay, amount: 0, start_year: 0, growth: {mean: 0.015, stdev: 0.03}, loss_probability: 0.03, loss_fraction: 0.5, taxable: true}
-  - {name: Partner Social Security, amount: 24000, start_year: 38}
+  - {name: Partner Social Security, amount: 24000, start_year: 45}
 
 expenses:
   - {name: Partner personal spending, amount: 0, start_year: 0}
 
 events:
-  - {name: Partner moves in, type: set_amount, target: Partner pay, amount: 90000, year: 4, jitter: 2}
+  - {name: Partner moves in, type: set_amount, target: Partner pay, amount: 90000, year: 8, jitter: 2}
   - {name: Partner spending starts, type: set_amount, target: Partner personal spending, amount: 14400, same_time_as: Partner moves in}
   - {name: Wedding, type: purchase, amount: 35000, same_time_as: Partner moves in, offset: 1}
-  - {name: Partner retires, type: set_amount, target: Partner pay, amount: 0, year: 36}
+  - {name: Partner retires, type: set_amount, target: Partner pay, amount: 0, year: 43}

@@ -30,6 +30,7 @@ from stats_projections.report import (
     COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
     debt_metrics, hours_metrics, income_milestones, net_worth_milestones, strategy_metrics,
     tier_shares)
+from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, pareto, score
 from stats_projections.sensitivity import Steps, analyze, knobs
 
 ROOT = Path(__file__).resolve().parent
@@ -236,6 +237,7 @@ tab_names = ["Results", "Milestones", "Lifestyle", "Hours", "Cash flow", "What i
              "Sensitivity", "Files"]
 if profile_file:
     tab_names.insert(5, "Assumptions")
+    tab_names.insert(1, "Decide")
 tabs = dict(zip(tab_names, st.tabs(tab_names)))
 tab_results, tab_edit, tab_sens, tab_files = (
     tabs["Results"], tabs["What if"], tabs["Sensitivity"], tabs["Files"])
@@ -917,9 +919,12 @@ with tabs["Hours"]:
         st.info("These options have no work-hours schedule. Add a `time:` section "
                 "(see careers/rd_engineer.yaml).")
     else:
-        st.markdown(f"Hours per week at work, by age. Lifetime totals assume {WEEKS_PER_YEAR} "
-                    "working weeks a year. Every career's hours are an estimate marked CHECK "
-                    "in its file, and strategies such as FIRE or coast cut them when they kick in.")
+        st.markdown("Hours per week at work, by age. Each career sets its hours for each "
+                    "phase (school, residency, associate, founder...) from survey data, listed "
+                    "under *Where the hours come from* below. Every career then eases about 5% at "
+                    "50 and another 5% at 58, and swings about 5% year to year. Lifetime totals "
+                    f"assume {WEEKS_PER_YEAR} working weeks a year; FIRE and coast strategies "
+                    "cut hours when they kick in.")
         hrs = pd.concat([
             pd.DataFrame({"x": ages(r)[:-1], "scenario": r.scenario.name,
                           "p10": np.percentile(r.hours, 10, axis=0),
@@ -966,6 +971,116 @@ with tabs["Hours"]:
         })
         st.caption("Take-home per work hour = lifetime take-home pay ÷ lifetime work hours "
                    "(Ph.D., school and training years included).")
+
+        st.subheader("Where the hours come from")
+        hour_files = ([career_file] if mode == "Strategies" else
+                      [scenarios[r.scenario.name][0] for r in hour_res])
+        prof_lines = [s for s in career_info(profile_file)["sources"] if s.startswith("Hours")]
+        if prof_lines:
+            with st.expander("Profile: Ph.D. hours and the age taper"):
+                st.markdown("\n".join(f"- {s.removeprefix('Hours: ')}" for s in prof_lines))
+        for f in dict.fromkeys(hour_files):
+            info = career_info(f)
+            notes = [a for a in info["assumptions"] if a.startswith("Hours")]
+            srcs = [s for s in info["sources"] if s.startswith("Hours")]
+            if not (notes or srcs):
+                continue
+            with st.expander(info["name"]):
+                st.markdown("\n".join(f"- {a.removeprefix('Hours: ')}" for a in notes))
+                if srcs:
+                    st.markdown("**Sources**\n\n" + "\n".join(
+                        f"- {s.removeprefix('Hours: ')}" for s in srcs))
+
+
+# ----------------------------------------------------------------------------
+# Decide: weighted scores and Pareto view
+# ----------------------------------------------------------------------------
+
+if profile_file:
+    with tabs["Decide"]:
+        st.markdown(
+            "Money is one part of the choice. Set how much each criterion matters to you; "
+            "every option gets a 0-100 score per criterion (0 = worst option here, 100 = best), "
+            "then a weighted total. Autonomy, satisfaction and burnout come from surveys listed "
+            "in each career file (Assumptions tab); several are marked CHECK.")
+        with st.expander("Weights (0 = ignore, 10 = matters most)", expanded=True):
+            wcols = st.columns(2)
+            weights = {}
+            for i, c in enumerate(CRITERIA):
+                weights[c.key] = wcols[i % 2].slider(
+                    c.label, 0, 10, DEFAULT_WEIGHTS[c.key], key=f"w_{c.key}", help=c.help)
+        scored = score(results, weights)
+        rows = []
+        for s_ in scored:
+            v = s_.values
+            rows.append({
+                "Option": s_.name, "Score": s_.total, "Financial": s_.financial, "Life": s_.life,
+                "Net worth 65": v["wealth"], "P10 at 65": v["downside"],
+                "FI age": v["fi_age"], "Low-pay years": v["training"],
+                "Lifetime hours": v["hours"], "Autonomy": v["autonomy"],
+                "Satisfied": v["satisfaction"], "Burnout": v["burnout"],
+            })
+        sdf = pd.DataFrame(rows)
+        st.subheader("Ranking")
+        st.dataframe(sdf, hide_index=True, use_container_width=True, column_config={
+            "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100,
+                                                     format="%.0f"),
+            "Financial": st.column_config.NumberColumn(format="%.0f"),
+            "Life": st.column_config.NumberColumn(format="%.0f"),
+            "Net worth 65": st.column_config.NumberColumn(format="$%,.0f"),
+            "P10 at 65": st.column_config.NumberColumn(format="$%,.0f"),
+            "FI age": st.column_config.NumberColumn(format="%.0f"),
+            "Low-pay years": st.column_config.NumberColumn(format="%.0f"),
+            "Lifetime hours": st.column_config.NumberColumn(format="%,.0f"),
+            "Autonomy": st.column_config.NumberColumn(format="%.0f"),
+            "Satisfied": st.column_config.NumberColumn(format="percent"),
+            "Burnout": st.column_config.NumberColumn(format="percent"),
+        })
+        end_age = a0 + base.horizon_years
+        st.caption(f"FI age: first age the portfolio reaches 25x that year's spending (an age of "
+                   f"{end_age} means the median path never does). Financial = weighted score of "
+                   "the money criteria only; Life = the rest.")
+
+        st.subheader("Pareto view")
+        axis_opts = ["Financial score", "Life score", *[c.label for c in CRITERIA]]
+        pc1, pc2 = st.columns(2)
+        x_lab = pc1.selectbox("Across", axis_opts, index=0, key="pareto_x")
+        y_lab = pc2.selectbox("Up", axis_opts, index=1, key="pareto_y")
+        by_label = {c.label: c for c in CRITERIA}
+
+        def axis_value(s_, lab):
+            if lab == "Financial score":
+                return s_.financial
+            if lab == "Life score":
+                return s_.life
+            return s_.normalized[by_label[lab].key] * 100
+
+        pts = [(axis_value(s_, x_lab), axis_value(s_, y_lab)) for s_ in scored]
+        front = pareto(pts)
+        pdf = pd.DataFrame({
+            "Option": [s_.name for s_ in scored],
+            "x": [p[0] for p in pts], "y": [p[1] for p in pts],
+            "Frontier": ["On the frontier" if f else "Beaten on both" for f in front],
+            "label": [s_.name if len(s_.name) <= 26 else s_.name[:25] + "…" for s_ in scored]})
+        enc_x = alt.X("x:Q", title=f"{x_lab} (right is better)", scale=alt.Scale(domain=[-5, 105]))
+        enc_y = alt.Y("y:Q", title=f"{y_lab} (up is better)", scale=alt.Scale(domain=[-5, 105]))
+        fr = pdf[pdf.Frontier == "On the frontier"].sort_values("x")
+        fline = alt.Chart(fr).mark_line(strokeDash=[5, 4], color="gray").encode(x=enc_x, y=enc_y)
+        dots = alt.Chart(pdf).mark_circle(size=140, opacity=0.9).encode(
+            x=enc_x, y=enc_y,
+            color=alt.Color("Frontier:N", title=None,
+                            scale=alt.Scale(domain=["On the frontier", "Beaten on both"],
+                                            range=["#2a6fdb", "#b0b7c3"])),
+            tooltip=["Option:N", alt.Tooltip("x:Q", format=".0f", title=x_lab),
+                     alt.Tooltip("y:Q", format=".0f", title=y_lab)])
+        labels = alt.Chart(pdf).mark_text(align="left", dx=8, dy=-6, fontSize=11).encode(
+            x=enc_x, y=enc_y, text="label:N")
+        show_chart(alt.layer(fline, dots, labels).properties(height=380),
+                   use_container_width=True)
+        st.caption("Each option on the frontier is the best available for some trade-off between "
+                   "the two axes: nothing else beats it on both. An option beaten on both is "
+                   "worth picking only for reasons outside these scores.")
+        st.markdown("**Frontier:** " + ", ".join(s_.name for s_, f in zip(scored, front) if f))
 
 
 # ----------------------------------------------------------------------------

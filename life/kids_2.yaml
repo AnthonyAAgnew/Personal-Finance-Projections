@@ -1,6 +1,6 @@
 name: Two children
 description: >
-  Two children: the first around age 34 (+-2), the second about three years
+  Two children: the first around age 32 (+-2), the second about three years
   later. Same daycare, everyday and college costs for each.
 
 include: kids_1.yaml
