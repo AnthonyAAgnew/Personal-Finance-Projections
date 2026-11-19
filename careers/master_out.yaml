@@ -1,0 +1,43 @@
+name: Master out, back to industry now
+description: >
+  Leave the Ph.D. now with your M.S. degrees and return to med device R&D
+  (e.g. back to J&J) next year, instead of finishing in up to four years.
+  Earlier pay and investing; no Ph.D. premium, so a lower starting level and
+  a slower climb. Compare with "R&D engineer" (finish the Ph.D. first).
+
+sources:
+  - "BLS OOH, Bioengineers and biomedical engineers: median $106,950 (May 2024): https://www.bls.gov/OOH/architecture-and-engineering/biomedical-engineers.htm"
+  - "Levels.fyi Medtronic: senior engineer ~$141k, principal ~$156-159k: https://www.levels.fyi/companies/medtronic/salaries/mechanical-engineer"
+  - "Hours: Consulting-Specifying Engineer 2024 survey: engineers average 43 hrs/week, 24% work 50+: https://www.csemag.com/how-mep-fp-engineers-are-living-a-dual-reality/"
+
+assumptions:
+  - "Leave after this academic year: industry from year 1 (age 23). The stipend and Ph.D. hours stop then."
+  - "Starts at ~$125k (senior engineer with an M.S. and 4 prior J&J years) vs $150k with the Ph.D. (CHECK)."
+  - "Principal around age 31 (~$160k) and senior principal or manager around age 38 (~$195k): the same top as the Ph.D. path, reached on a similar age schedule but from a lower start (CHECK)."
+  - "3% yearly layoff risk; 6% 401(k) match."
+  - "Hours: 44/week, the same engineering survey data as R&D."
+  - "Not modeled: research credentials that some R&D leadership, academic or founder roles favor."
+
+income:
+  - name: Ph.D. stipend
+    end_year: 1
+  - name: Career pay
+    amount: 125000
+    start_year: 1
+    growth: {mean: 0.01, stdev: 0.03}
+    noise: 0.05
+    loss_probability: 0.03
+    loss_fraction: 0.4
+    taxable: true
+    confidence: medium
+  - {name: Employer 401(k) match, amount: 7500, start_year: 1, end_year: 43, spendable: false}
+
+time:
+  - {name: Ph.D. hours, end_year: 1}
+  - {name: Work hours, amount: 44, start_year: 1}
+
+events:
+  - {name: Principal engineer, type: set_amount, target: Career pay, amount: 160000, year: 9, jitter: 1, confidence: medium}
+  - {name: Senior principal or manager, type: set_amount, target: Career pay, amount: 195000, year: 16, jitter: 2, confidence: medium}
+
+quality: {autonomy: 75, satisfaction: 0.75, burnout: 0.46}

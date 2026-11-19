@@ -6,15 +6,15 @@ sources:
   - "WageDex (BLS OEWS 17-2031): San Diego median $128,270: https://wagedex.com/jobs/bioengineers-and-biomedical-engineers/metro/san-diego-chula-vista-carlsbad-ca"
 
 assumptions:
-  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 2)."
+  - "Relative to Irvine, the profile's baseline. You move when your post-Ph.D. career starts (year 4)."
   - "Pay about the same as Irvine; rent about 5% lower (CHECK)."
   - "Careers already tied to a place (FDA in Maryland, quant finance in New York) get this adjustment on top of their own; treat those combinations loosely."
 
 lifestyle:
-  cost_index: [[2, 1.0]]
+  cost_index: [[4, 1.0]]
 
 events:
-  - {name: Move to San Diego, type: scale, target: Career pay, factor: 1.0, year: 2}
+  - {name: Move to San Diego, type: scale, target: Career pay, factor: 1.0, year: 4}
   - {name: Moving costs, type: purchase, amount: 5000, same_time_as: Move to San Diego}
   - {name: Rent there, type: scale, target: Housing, factor: 0.95, same_time_as: Move to San Diego}
   - {name: Other costs there, type: scale, target: [Food, Transport, Health & insurance, Utilities & phone, Fun & dining, Travel, Shopping & other], factor: 1.0, same_time_as: Move to San Diego}

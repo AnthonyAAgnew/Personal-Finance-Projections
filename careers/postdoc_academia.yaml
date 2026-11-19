@@ -13,22 +13,22 @@ sources:
 
 assumptions:
   - "3-5 year postdoc starting at $62,232, rising ~2%/yr with NRSA steps."
-  - "25% land a tenure-track job around age 28 (CHECK: commonly cited rates are 10-25%); the rest move to industry R&D at ~$140k, a little behind having gone straight to industry."
+  - "25% land a tenure-track job around age 30 (CHECK: commonly cited rates are 10-25%); the rest move to industry R&D at ~$140k, a little behind having gone straight to industry."
   - "Assistant professor ~$125k including summer salary (CHECK: no source found for BME assistant professor pay); 80% earn tenure 6 years later (~$150k), then 60% reach full professor (~$190k)."
   - "Denied tenure (20%): move to industry at ~$150k."
   - "Hours: postdoc 51 (NSF 50.3), assistant professor 58 (tenure-track runs 4-6 above the 53.4 faculty average), tenured 54, full professor 52, industry 44."
   - "Autonomy 95 (Biological Science Teachers, Postsecondary: 99; postdocs have less). Burnout 52% (midpoint of 2024 faculty surveys, 41-64%). Satisfaction 68% (Nature 2023 postdocs: 24-34% dissatisfied)."
 
 income:
-  - {name: Career pay, amount: 62232, start_year: 2, growth: {mean: 0.02, stdev: 0.01}, taxable: true}
-  - {name: Employer 401(k) match, amount: 0, start_year: 2, end_year: 43, spendable: false}
+  - {name: Career pay, amount: 62232, start_year: 4, growth: {mean: 0.02, stdev: 0.01}, taxable: true}
+  - {name: Employer 401(k) match, amount: 0, start_year: 4, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 51, start_year: 2}
+  - {name: Work hours, amount: 51, start_year: 4}
 
 events:
-  - {name: Tenure-track job, type: set_amount, target: Career pay, amount: 125000, year: 6, jitter: 1, group: market, probability: 0.25}
-  - {name: Leaves for industry, type: set_amount, target: Career pay, amount: 140000, year: 6, jitter: 1, group: market, probability: 0.75}
+  - {name: Tenure-track job, type: set_amount, target: Career pay, amount: 125000, year: 8, jitter: 1, group: market, probability: 0.25, confidence: medium}
+  - {name: Leaves for industry, type: set_amount, target: Career pay, amount: 140000, year: 8, jitter: 1, group: market, probability: 0.75}
   - {name: Industry match, type: set_amount, target: Employer 401(k) match, amount: 8400, same_time_as: Leaves for industry}
   - {name: University retirement match, type: set_amount, target: Employer 401(k) match, amount: 10000, same_time_as: Tenure-track job}
   - {name: Assistant professor hours, type: set_amount, target: Work hours, amount: 58, same_time_as: Tenure-track job}

@@ -14,19 +14,19 @@ sources:
 assumptions:
   - "Salary ~$150k, a bit below big-company total pay. CHECK"
   - "10% yearly chance the startup folds or you are cut (lose ~40% of that year's pay while job hunting)."
-  - "Equity, around age 32 (+-3): 10% chance of a modest payout (median $500k), 3% chance of a big one (median $3M); 87% nothing. Taxed at a flat 25%. CHECK: no public data on employee payout rates was found."
+  - "Equity, around age 34 (+-3): 10% chance of a modest payout (median $500k), 3% chance of a big one (median $3M); 87% nothing. Taxed at a flat 25%. CHECK: no public data on employee payout rates was found."
   - "Hours: 50/week. No survey of early startup employees was found; set between engineers' 43-45 and founders' 60+ (CHECK)."
   - "Autonomy 82 (Software Developers). Burnout 85% (Jellyfish: engineers on teams under 10). Satisfaction 70% (CHECK)."
 
 income:
-  - {name: Career pay, amount: 150000, start_year: 2, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.10, loss_fraction: 0.4, taxable: true}
+  - {name: Career pay, amount: 150000, start_year: 4, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.10, loss_fraction: 0.4, taxable: true}
 
 time:
-  - {name: Work hours, amount: 50, start_year: 2}
+  - {name: Work hours, amount: 50, start_year: 4}
 
 events:
-  - {name: Equity payout (modest exit), type: windfall, amount: 500000, spread: 1.0, tax_rate: 0.25, year: 10, jitter: 3, group: equity, probability: 0.10}
-  - {name: Equity payout (big exit), type: windfall, amount: 3000000, spread: 0.8, tax_rate: 0.25, year: 10, jitter: 3, group: equity, probability: 0.03}
+  - {name: Equity payout (modest exit), type: windfall, amount: 500000, spread: 1.0, tax_rate: 0.25, year: 12, jitter: 3, group: equity, probability: 0.10, confidence: low}
+  - {name: Equity payout (big exit), type: windfall, amount: 3000000, spread: 0.8, tax_rate: 0.25, year: 12, jitter: 3, group: equity, probability: 0.03, confidence: low}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 82, satisfaction: 0.7, burnout: 0.85}

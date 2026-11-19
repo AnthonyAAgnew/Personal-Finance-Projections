@@ -13,21 +13,21 @@ sources:
 
 assumptions:
   - "Senior product design engineer at ~$135k (above the BLS median given the Ph.D. and J&J years). CHECK"
-  - "Staff level around age 31 (~$170k); 25% reach principal at a top consumer-hardware company (~$230k) around age 35. CHECK"
+  - "Staff level around age 33 (~$170k); 25% reach principal at a top consumer-hardware company (~$230k) around age 37. CHECK"
   - "3% yearly layoff risk."
   - "Hours: 44/week, the same engineering survey data as R&D."
   - "Autonomy 81 (Mechanical Engineers). Burnout and satisfaction as for engineers (CHECK)."
 
 income:
-  - {name: Career pay, amount: 135000, start_year: 2, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.03, loss_fraction: 0.4, taxable: true}
-  - {name: Employer 401(k) match, amount: 8000, start_year: 2, end_year: 43, spendable: false}
+  - {name: Career pay, amount: 135000, start_year: 4, growth: {mean: 0.01, stdev: 0.03}, noise: 0.05, loss_probability: 0.03, loss_fraction: 0.4, taxable: true}
+  - {name: Employer 401(k) match, amount: 8000, start_year: 4, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 44, start_year: 2}
+  - {name: Work hours, amount: 44, start_year: 4}
 
 events:
-  - {name: Staff product design engineer, type: set_amount, target: Career pay, amount: 170000, year: 7, jitter: 1}
-  - {name: Principal at top hardware company, type: set_amount, target: Career pay, amount: 230000, year: 11, jitter: 2, probability: 0.25}
+  - {name: Staff product design engineer, type: set_amount, target: Career pay, amount: 170000, year: 9, jitter: 1}
+  - {name: Principal at top hardware company, type: set_amount, target: Career pay, amount: 230000, year: 13, jitter: 2, probability: 0.25, confidence: low}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 81, satisfaction: 0.75, burnout: 0.46}

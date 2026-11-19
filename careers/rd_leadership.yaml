@@ -1,0 +1,29 @@
+extends: rd_engineer.yaml
+name: R&D, then director / VP track
+description: >
+  Industry R&D with a deliberate move into management: engineering manager,
+  then director, with a chance at VP of R&D. More pay and equity at the top,
+  longer weeks, and fewer seats at each step.
+
+sources:
+  - "Autonomy: O*NET 'Freedom to Make Decisions' for Architectural and Engineering Managers: 88: https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Satisfaction: Jellyfish 2024: ~37% of engineering managers find their work rewarding vs 75% of engineers: https://jellyfish.co/blog/2024-state-of-engineering-management-report/"
+
+assumptions:
+  - "70% become an engineering manager around age 31 (+-1) at ~$185k total; the rest stay technical and reach senior principal (~$195k) around age 35 (CHECK)."
+  - "Half of managers become a director about 5 years later (~$260k with bonus and stock), and 30% of directors become VP of R&D about 6 years after that (~$420k) (CHECK: typical large-OEM levels; no reliable public source was found)."
+  - "Hours: 47 as a manager, 50 as a director, 55 as VP (CHECK)."
+  - "Autonomy 88 (Architectural and Engineering Managers). Satisfaction 60% (between the 37% of managers and 75% of engineers in Jellyfish, CHECK). Burnout 50% (CHECK)."
+
+events:
+  - {name: Promotion to senior principal, remove: true}
+  - {name: Engineering manager, type: set_amount, target: Career pay, amount: 185000, year: 9, jitter: 1, group: ladder, probability: 0.7, confidence: medium}
+  - {name: Stays technical, type: set_amount, target: Career pay, amount: 150000, year: 9, jitter: 1, group: ladder, probability: 0.3}
+  - {name: Senior principal (technical), type: set_amount, target: Career pay, amount: 195000, same_time_as: Stays technical, offset: 4, jitter: 1, confidence: medium}
+  - {name: Director of R&D, type: set_amount, target: Career pay, amount: 260000, same_time_as: Engineering manager, offset: 5, jitter: 1, probability: 0.5, confidence: medium}
+  - {name: VP of R&D, type: set_amount, target: Career pay, amount: 420000, same_time_as: Director of R&D, offset: 6, jitter: 2, probability: 0.3, confidence: low}
+  - {name: Manager hours, type: set_amount, target: Work hours, amount: 47, same_time_as: Engineering manager}
+  - {name: Director hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Director of R&D}
+  - {name: VP hours, type: set_amount, target: Work hours, amount: 55, same_time_as: VP of R&D}
+
+quality: {autonomy: 88, satisfaction: 0.60, burnout: 0.50}

@@ -1,15 +1,18 @@
-name: Coast FIRE
+name: Coast, half pay and hours
 description: >
   Once your portfolio would grow to 25x spending by 65 with no more saving,
   switch to an easier job at half the pay and half the hours until 65.
+  This is a semi-retirement variant; see "Coast FIRE (stop saving)" for the
+  standard definition. It assumes you can find a half-time role, which is not
+  guaranteed.
 assumptions:
   - "Coast number uses a 4.5% real return (7% nominal minus 2.5% inflation)."
   - "After coasting: 50% of career pay and 50% of work hours until the planned retirement."
 strategy:
-  name: Coast FIRE
+  name: Coast, half pay and hours
   kind: coast
   multiple: 25
-  min_year: 5             # start checking 3 years into the career
+  min_year: 7             # start checking 3 years into the career
   coast_factor: 0.5
   expected_real_return: 0.045
   target_year: 43

@@ -1,0 +1,55 @@
+extends: rd_engineer.yaml
+name: R&D engineer, part-time founder
+description: >
+  Keep the R&D job and build a device company on nights and weekends from
+  about age 28. If it gets traction (a prototype, early data, a lead
+  investor), leave to run it full time with funding; if not, drop it after
+  five years and stay in industry. Less risk than quitting, but long weeks
+  and a slower start.
+
+sources:
+  - "Founder hours and outcomes as in the entrepreneur paths (Antler, Citeline, PMCF); see those files."
+
+assumptions:
+  - "Side project from age 28 for up to 5 years: ~12 extra hours a week (56 total) and ~$10k a year of your own money for prototypes, filings and travel (CHECK)."
+  - "20% chance it gets traction around age 33 (+-1) and you leave with seed funding at a $175k founder salary (CHECK). Otherwise you stop and keep climbing in industry."
+  - "Funded companies: 30% acquired about 5 years later (cap table as in 'Industry, then device founder', but you keep more since the early work was unpaid: 40% starting stake), 70% shut down and you return to industry at $175k."
+  - "Employment agreements often give employers rights to inventions made on their time or in their field: check yours before starting (not modeled)."
+  - "Hours: 56 while building on the side, 60 once funded, 44 otherwise."
+
+events:
+  - {name: Promotion to senior principal, remove: true}
+  - {name: Side project hours, type: set_amount, target: Work hours, amount: 56, year: 6, duration: 5}
+  - {name: Side project costs 1, type: purchase, amount: 10000, year: 6}
+  - {name: Side project costs 2, type: purchase, amount: 10000, year: 7}
+  - {name: Side project costs 3, type: purchase, amount: 10000, year: 8}
+  - {name: Side project costs 4, type: purchase, amount: 10000, year: 9}
+  - {name: Side project costs 5, type: purchase, amount: 10000, year: 10}
+  - {name: Side project gets traction, type: set_amount, target: Career pay, amount: 175000, year: 11, jitter: 1, group: side, probability: 0.2, confidence: medium}
+  - {name: Side project stops, type: set_amount, target: Career pay, amount: 195000, year: 12, jitter: 2, group: side, probability: 0.8, confidence: medium}
+  - {name: No match while founding, type: set_amount, target: Employer 401(k) match, amount: 0, same_time_as: Side project gets traction}
+  - {name: Hours as funded founder, type: set_amount, target: Work hours, amount: 60, same_time_as: Side project gets traction}
+  - name: Company acquired
+    type: windfall
+    confidence: low
+    equity:
+      sale_median: 120000000
+      sale_spread: 1.0
+      founder_share: 0.40
+      option_pool: 0.15
+      dilution: [0.20, 0.25, 0.20]
+      raised: 70000000
+      qsbs_cap: 15000000
+    same_time_as: Side project gets traction
+    offset: 5
+    jitter: 2
+    group: outcome
+    probability: 0.3
+  - {name: Role after acquisition, type: set_amount, target: Career pay, amount: 210000, same_time_as: Company acquired}
+  - {name: Company shuts down, type: set_amount, target: Career pay, amount: 175000, same_time_as: Side project gets traction, offset: 5, jitter: 2, group: outcome, probability: 0.7}
+  - {name: Match back (after acquisition), type: set_amount, target: Employer 401(k) match, amount: 9000, same_time_as: Company acquired}
+  - {name: Match back (after shutdown), type: set_amount, target: Employer 401(k) match, amount: 9000, same_time_as: Company shuts down}
+  - {name: Hours after acquisition, type: set_amount, target: Work hours, amount: 44, same_time_as: Company acquired}
+  - {name: Hours after shutdown, type: set_amount, target: Work hours, amount: 44, same_time_as: Company shuts down}
+
+quality: {autonomy: 82, satisfaction: 0.72, burnout: 0.55}

@@ -9,6 +9,8 @@ description: >
 extends: rd_engineer.yaml
 
 sources:
+  - "QSBS: the One Big Beautiful Bill Act (2025) raised the federal gain exclusion to $15M for stock issued after July 4, 2025; California does not follow QSBS (via search)"
+  - "PMCF via MedDeviceGuide: median medtech M&A upfront value $171M in Q1 2026 (disclosed deals; undisclosed deals are usually smaller): https://meddeviceguide.com/blog/medtech-ma-market-analysis-h1-2026-deal-trends-strategic-shifts-guide"
   - "Hours: Antler 2025 founder survey via The Next Web: ~75% of founders work 60+ hrs/week, 19% 80+; Australian venture-backed founders average 64: https://thenextweb.com/news/european-startup-founders-work-long-hours"
   - "Burnout: Sifted 2025 founder survey (138 founders): 54% burned out in the past 12 months; Startup Snapshot 2023: 72% report a mental health impact: https://fortune.com/2025/09/12/we-studied-entrepreneurs-burnout-anxious-depressed-wellbeing/"
   - "Kruze Consulting startup CEO salaries 2025: seed ~$147k, Series A ~$203k: https://kruzeconsulting.com/blog/post/startup-ceo-salary-report"
@@ -16,14 +18,21 @@ sources:
   - "PMCF via MedDeviceGuide: median medtech M&A upfront value $171M in Q1 2026: https://meddeviceguide.com/blog/medtech-ma-market-analysis-h1-2026-deal-trends-strategic-shifts-guide"
 
 assumptions:
-  - "Leaves industry around age 28 (±1). No salary and no 401(k) match while bootstrapping; living costs come out of your portfolio (lifestyle tiers shrink as income stops)."
+  - "Exit proceeds from a cap table (CHECK): you start with 35% since savings replace a seed round, a 15% option pool, then Series A, B and C dilute 25%, 25% and 20%, leaving ~13%. Investors put in $70M with 1x non-participating preference; sale price median $120M. About 3 in 10 acquisitions pay founders nothing."
+  - "Tax: California 13.3% on all of it; federal 23.8% only above the $15M QSBS exclusion."
+  - "Leaves industry around age 30 (±1). No salary and no 401(k) match while bootstrapping; living costs come out of your portfolio (lifestyle tiers shrink as income stops)."
   - "About 2 years later, 50% raise a seed or Series A (vs 40% when founding straight out of the Ph.D.: industry experience and contacts help, CHECK) and pay a founder salary of $175k. The other 50% return to industry at $165k."
   - "Funded companies resolve about 5 years later (±2): 30% acquired, 70% shut down, as in the entrepreneur path."
-  - "Founder proceeds at an exit: median $6M before tax (vs $5M), since a self-funded start usually means less early dilution (CHECK). Lognormal spread 1.0, taxed at 20%."
   - "After an exit, an industry role at $210k; after a shutdown or no funding, $175k-$165k with the 401(k) match back."
   - "The R&D path's age-40 promotion is dropped; returning to industry is the promotion here."
   - "Hours: 44 in industry, 62 while bootstrapping, 60 once funded, 44 after."
   - "Autonomy 90: years in industry (75) and as a founder (99), weighted by time (CHECK). Burnout 50%: founders' 54%, diluted by industry years. Satisfaction 72% (CHECK)."
+
+# Runway window: two years before founding (to build it) through the first
+# funding decision. Used by the runway add-ons in life/.
+portfolio:
+  cash:
+    runway_window: [6, 12]
 
 events:
   - {name: Promotion to senior principal, remove: true}
@@ -32,10 +41,11 @@ events:
     type: set_amount
     target: Career pay
     amount: 0
-    year: 6
+    year: 8
     jitter: 1
   - {name: No match while founding, type: set_amount, target: Employer 401(k) match, amount: 0, same_time_as: Leaves to found a company}
   - name: Raises venture funding
+    confidence: medium
     type: set_amount
     target: Career pay
     amount: 175000
@@ -53,9 +63,15 @@ events:
     probability: 0.5
   - name: Company acquired
     type: windfall
-    amount: 6000000
-    spread: 1.0
-    tax_rate: 0.20
+    confidence: low
+    equity:
+      sale_median: 120000000      # CHECK
+      sale_spread: 1.0
+      founder_share: 0.35         # self-funded longer, so a bigger starting stake
+      option_pool: 0.15
+      dilution: [0.25, 0.25, 0.20]         # Series A, B, C (no seed round needed)
+      raised: 70000000
+      qsbs_cap: 15000000
     same_time_as: Raises venture funding
     offset: 5
     jitter: 2

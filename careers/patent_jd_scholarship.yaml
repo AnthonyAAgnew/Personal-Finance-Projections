@@ -1,0 +1,17 @@
+extends: patent_prosecution.yaml
+name: Patent attorney, JD half scholarship
+description: >
+  Patent prosecution after a JD with a 50% merit scholarship: half the
+  tuition and half the loans. Technical Ph.D.s are attractive to IP-focused
+  law schools, so partial scholarships are common (CHECK for your targets).
+
+assumptions:
+  - "Tuition ~$25k/yr after a 50% scholarship, borrowed at 8%: ~$75k of loans instead of ~$150k (CHECK)."
+
+events:
+  - {name: Law school tuition 1L, amount: 25000}
+  - {name: Law school tuition 2L, amount: 25000}
+  - {name: Law school tuition 3L, amount: 25000}
+  - {name: Law loan 1L, amount: 25000}
+  - {name: Law loan 2L, amount: 25000}
+  - {name: Law loan 3L, amount: 25000}

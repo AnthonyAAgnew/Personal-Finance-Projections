@@ -53,6 +53,35 @@ python -m streamlit run app.py
 - **Employer matches** use `spendable: false`, so they go straight to
   savings and are not take-home.
 
+### Money, markets and risk
+
+- **Cash and investments:** the profile holds `portfolio.cash` (balance,
+  reserve months) apart from investments. Savings refill the reserve first;
+  shortfalls come out of cash first.
+- **Glide path:** `portfolio.bonds` and `portfolio.allocation` blend stocks and
+  bonds by year (90% stocks to 45, 60% at 65, 50% at 75 in the profile).
+- **Market scenarios** (sidebar): lost decade, high-inflation decade, crash in
+  your first career year, crash right after retiring, depression-level shock.
+  Each lays fixed shocks over the same random paths (`stats_projections/stress.py`).
+- **Three failure types:** cash crunch (the old P(fail)), negative net worth
+  after 40, and running out after 65.
+- **Startup runway:** founder careers set `cash.runway_window`; the life
+  events "Startup runway: 4 / 2 years in cash" hold that much spending in cash
+  through it. The Results tab shows whether cash or all liquid assets ran out.
+- **Cap-table exits:** a windfall with `equity:` works out founder proceeds
+  from the sale price, founder share, option pool, round dilution and 1x
+  preferences, with QSBS-aware tax.
+- **Confidence:** `confidence: medium | low` on a stream or event widens it
+  (a persistent per-path level for streams). Assumptions marked CHECK show as
+  low confidence in the app.
+- **Home ownership:** `life/buy_home.yaml` uses the `home` event type: down
+  payment, mortgage, owner costs and appreciation; the home counts in net worth.
+- **Coast FIRE (stop saving)** is the standard definition; "Coast, half pay and
+  hours" is the semi-retirement variant.
+- **Break-even finder** (Sensitivity tab): solves for the value of one input of
+  option A (EP pay, exit price, tuition) that makes it match option B.
+- **Free time** (Hours tab): waking hours left after work and commuting.
+
 ### Decide: weighted scores and Pareto view
 
 - Eight criteria per option: net worth at 65 (median and P10), financial

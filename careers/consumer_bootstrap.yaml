@@ -12,21 +12,26 @@ sources:
 
 assumptions:
   - "Year 1: $40k of your savings for tooling, inventory and launch. Owner pay ~$20k/yr until the business proves out."
-  - "Around age 27 (+-1): 35% take off (owner earnings ~$160k, swinging +-30% a year), 65% close and you return to industry (~$140k). Below the 49% all-business average because solo product launches are riskier. CHECK"
+  - "Around age 29 (+-1): 35% take off (owner earnings ~$160k, swinging +-30% a year), 65% close and you return to industry (~$140k). Below the 49% all-business average because solo product launches are riskier. CHECK"
   - "Of the businesses that take off, 20% are sold ~8 years later (median $1.5M, ~3x owner earnings; taxed 20%) and you take a ~$150k job."
   - "Hours: 60 while building (founder surveys), 50 once it works (CHECK), 44 back in industry."
   - "Autonomy 99 (Chief Executives). Burnout 54% (Sifted 2025 founders). Satisfaction 70% (CHECK)."
 
+# Runway window: building the business until it takes off or closes.
+portfolio:
+  cash:
+    runway_window: [4, 8]
+
 income:
-  - {name: Career pay, amount: 20000, start_year: 2, noise: 0.3, taxable: true}
+  - {name: Career pay, amount: 20000, start_year: 4, noise: 0.3, taxable: true}
 
 time:
-  - {name: Work hours, amount: 60, start_year: 2}
+  - {name: Work hours, amount: 60, start_year: 4}
 
 events:
-  - {name: Tooling and inventory, type: purchase, amount: 40000, year: 2}
-  - {name: Business takes off, type: set_amount, target: Career pay, amount: 160000, year: 5, jitter: 1, group: outcome, probability: 0.35}
-  - {name: Business closes, type: set_amount, target: Career pay, amount: 140000, year: 5, jitter: 1, group: outcome, probability: 0.65}
+  - {name: Tooling and inventory, type: purchase, amount: 40000, year: 4}
+  - {name: Business takes off, type: set_amount, target: Career pay, amount: 160000, year: 7, jitter: 1, group: outcome, probability: 0.35, confidence: low}
+  - {name: Business closes, type: set_amount, target: Career pay, amount: 140000, year: 7, jitter: 1, group: outcome, probability: 0.65}
   - {name: Owner hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Business takes off}
   - {name: Industry hours (after closing), type: set_amount, target: Work hours, amount: 44, same_time_as: Business closes}
   - {name: Sells the business, type: windfall, amount: 1500000, spread: 0.8, tax_rate: 0.20, same_time_as: Business takes off, offset: 8, jitter: 2, probability: 0.2}

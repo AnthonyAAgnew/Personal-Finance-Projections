@@ -54,6 +54,10 @@ from stats_projections.report import (
     tier_shares)
 from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, pareto, score
 from stats_projections.sensitivity import Steps, analyze, knobs
+from stats_projections.breakeven import METRICS as BE_METRICS, levers as be_levers, solve as be_solve
+from stats_projections.stress import DESCRIPTIONS as STRESS_HELP, presets as stress_presets
+from stats_projections.report import (FAILURE_MODES, failure_modes, free_time,
+                                      runway_metrics)
 
 ROOT = Path(__file__).resolve().parent
 SCENARIO_DIR = ROOT / "scenarios"
@@ -228,8 +232,10 @@ with st.sidebar:
         model = st.radio("Return model", ["normal", "student_t"],
                          index=0 if r.model == "normal" else 1, horizontal=True,
                          help="student_t keeps the mean and volatility but adds fatter tails (more crashes).")
-        mean = st.slider("Portfolio return (nominal)", 0.0, 12.0, round(r.mean * 100, 2), 0.25,
-                         format="%.2f%%")
+        mean = st.slider("Stock return (nominal)" if base.allocation else "Portfolio return (nominal)",
+                         0.0, 12.0, round(r.mean * 100, 2), 0.25, format="%.2f%%",
+                         help="With a glide path (profile allocation), this is the stock part; "
+                              "bonds and cash have their own returns in the profile.")
         stdev = st.slider("Return volatility", 0.0, 30.0, round(r.stdev * 100, 1), 0.5,
                           format="%.1f%%")
         dof = r.dof
@@ -245,10 +251,20 @@ with st.sidebar:
                         format="%.1f%%")
     inflation = replace(i, mean=round(infl_mean / 100, 6), stdev=round(infl_sd / 100, 6))
 
+    retire_ev = next((e for e in base.events if e.name == "Retire"), None)
+    retire_year = retire_ev.year if retire_ev else max(base.horizon_years - 30, 1)
+    career_start = next((x.start_year for x in base.income if x.name == "Career pay"), 0)
+    stress_options = stress_presets(career_start, retire_year)
+    stress_name = st.selectbox("Market scenario", list(stress_options),
+                               help="Stress tests lay a bad stretch of years over every random "
+                                    "path, so options are still compared on the same markets.")
+    st.caption(STRESS_HELP[stress_name])
+    stress = stress_options[stress_name]
+
 
 def shared(s):
     return replace(s, paths=int(paths), seed=int(seed), failure_floor=float(floor),
-                   returns=returns, inflation=inflation)
+                   returns=returns, inflation=inflation, stress=stress or s.stress)
 
 
 # ----------------------------------------------------------------------------
@@ -315,13 +331,13 @@ with tab_edit:
     st.subheader("Income")
     inc_df = st.data_editor(stream_frame(base.income), column_config=stream_cols,
                             num_rows="dynamic", hide_index=True, key=f"{ed}/income",
-                            use_container_width=True)
+                            width="stretch")
     st.subheader("Expenses")
     exp_df = st.data_editor(stream_frame(base.expenses),
                             column_config={k: v for k, v in stream_cols.items() if k != "taxable"},
                             column_order=[c for c in stream_cols if c != "taxable"],
                             num_rows="dynamic", hide_index=True, key=f"{ed}/expenses",
-                            use_container_width=True)
+                            width="stretch")
 
     stream_names = [n for n in [*inc_df["name"].tolist(), *exp_df["name"].tolist()]
                     if isinstance(n, str) and n]
@@ -357,7 +373,7 @@ with tab_edit:
             "offset": st.column_config.NumberColumn("Offset (yrs)", step=1),
             "duration": st.column_config.NumberColumn("Duration (yrs)", min_value=1, step=1),
         },
-        num_rows="dynamic", hide_index=True, key=f"{ed}/events", use_container_width=True,
+        num_rows="dynamic", hide_index=True, key=f"{ed}/events", width="stretch",
     )
     st.caption("Loan rate, term and deferral, windfall tax and spread are kept from the file; "
                "edit them in the YAML.")
@@ -385,7 +401,7 @@ with tab_edit:
                 **{c: st.column_config.NumberColumn(f"{c} ($/mo)", min_value=0, step=50, format="%d")
                    for c in cat_cols},
             },
-            num_rows="dynamic", hide_index=True, key=f"{ed}/tiers", use_container_width=True,
+            num_rows="dynamic", hide_index=True, key=f"{ed}/tiers", width="stretch",
         )
         monthly_totals = tier_df[cat_cols].fillna(0).sum(axis=1)
         st.caption("Monthly totals: " + ", ".join(
@@ -502,7 +518,13 @@ with tab_edit:
         fname = f"{_slug(new_name)}.yaml"
         cdl, csave = st.columns(2)
         cdl.download_button("Download YAML", text, file_name=fname, mime="text/yaml")
-        if save_dir is None:
+        host = (st.context.headers.get("Host") or "").split(":")[0]
+        if host not in ("localhost", "127.0.0.1", "::1"):
+            csave.caption("Saving to the app's folders only works when you run the app on your "
+                          "own computer. On the hosted app, download the file and add it to the "
+                          "repo (shared server files would be visible to everyone and lost on "
+                          "redeploy).")
+        elif save_dir is None:
             csave.caption("In Strategies mode, download the change and save it as a career or "
                           "strategy file yourself.")
         else:
@@ -614,7 +636,7 @@ with tab_results:
         money_cols = [c for c in df.columns
                       if c.startswith(("Median", "P10", "P90", "Lifetime", "Peak", "Take-home"))]
         st.dataframe(
-            df, hide_index=True, use_container_width=True,
+            df, hide_index=True, width="stretch",
             column_config={
                 **{c: st.column_config.NumberColumn(c, format="$%,.0f") for c in money_cols},
                 f"Chance ≥ {money(target)}": st.column_config.ProgressColumn(
@@ -638,7 +660,7 @@ with tab_results:
                 p25, p50, p75 = np.percentile(res.net_worth[:, a - r_a0], [25, 50, 75])
                 row[f"Age {a}"] = f"{money(p50)} ({money(p25)} to {money(p75)})"
             cp_rows.append(row)
-        st.dataframe(pd.DataFrame(cp_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(cp_rows), hide_index=True, width="stretch")
         st.caption("Median net worth, with the middle half of paths (P25 to P75) in "
                    "brackets. Long-training paths start behind and catch up later, so "
                    "compare the columns, not just the last one.")
@@ -656,7 +678,7 @@ with tab_results:
                     tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
                              alt.Tooltip("owed:Q", format="$,.0f")],
                 ).properties(height=220),
-                use_container_width=True)
+                width="stretch")
             st.caption("Averages include paths that never borrow (for example, physician paths "
                        "where admission fails), so the typical borrower owes more; see the peak "
                        "loans column.")
@@ -697,7 +719,7 @@ with tab_results:
     )
     zero = alt.Chart(pd.DataFrame({"y": [floor]})).mark_rule(color="gray").encode(y="y:Q")
     show_chart((area + line + zero).properties(height=420).interactive(bind_y=False),
-                    use_container_width=True)
+                    width="stretch")
 
     if any(r.income is not None and r.income.any() for r in results):
         basis = st.radio("Income shown", ["Take-home (after tax)", "Gross (before tax)"],
@@ -732,16 +754,23 @@ with tab_results:
             layers.append(alt.Chart(marks).mark_text(align="left", dx=4, dy=-6, color="gray",
                                                      fontSize=11).encode(
                 y="y:Q", text="label:N", x=alt.value(0)))
-        show_chart(alt.layer(*layers).properties(height=320), use_container_width=True)
+        show_chart(alt.layer(*layers).properties(height=320), width="stretch")
         st.caption("Dashed lines mark the take-home milestones (see the Milestones tab). Mean (in "
                    "the tooltip) can sit far above the median for careers with rare big outcomes.")
 
+    modes = {res.scenario.name: failure_modes(res) for res in results}
+    st.subheader("Share of paths that have failed, by age")
+    fail_kind = st.radio("Failure means", list(FAILURE_MODES), horizontal=True,
+                         format_func=lambda k: {"crunch": "Cash crunch",
+                                                "insolvent": "Negative net worth after 40",
+                                                "retirement": "Runs out after 65"}[k],
+                         help="\n\n".join(FAILURE_MODES.values()))
     fail = pd.concat([
         pd.DataFrame({"x": ages(res)[1:], "scenario": res.scenario.name,
-                      "failed": summarize(res).cumulative_failure})
+                      "failed": modes[res.scenario.name][fail_kind]["cumulative"]})
         for res in results
     ])
-    st.subheader("Share of paths below the floor")
+    st.caption(FAILURE_MODES[fail_kind] + ".")
     show_chart(
         alt.Chart(fail).mark_line(strokeWidth=2.5).encode(
             x=alt.X("x:Q", title=x_title),
@@ -750,19 +779,21 @@ with tab_results:
             tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
                      alt.Tooltip("failed:Q", format=".1%")],
         ).properties(height=240),
-        use_container_width=True,
+        width="stretch",
     )
 
     table = []
     for res in results:
         s = summarize(res)
         row = {
-            "Option": s.name, "P(fail)": f"{100 * s.p_fail:.1f}%",
+            "Option": s.name, "Cash crunch (P(fail))": f"{100 * s.p_fail:.1f}%",
             "95% CI": f"{100 * s.ci[0]:.1f}% to {100 * s.ci[1]:.1f}%",
             "Ends below": f"{100 * s.p_end_below:.1f}%",
             "Median first failure": "-" if s.median_failure_year is None else
             (f"age {res.scenario.start_age + s.median_failure_year:.0f}"
              if res.scenario.start_age is not None else f"year {s.median_failure_year:.0f}"),
+            "Negative net worth after 40": f"{100 * modes[s.name]['insolvent']['p']:.1f}%",
+            "Runs out after 65": f"{100 * modes[s.name]['retirement']['p']:.1f}%",
             "P10 end": money(s.terminal[10]), "Median end": money(s.terminal[50]),
             "P90 end": money(s.terminal[90]),
         }
@@ -772,10 +803,33 @@ with tab_results:
                 f"{100 * d.delta:+.1f} pts [{100 * d.ci[0]:+.1f}, {100 * d.ci[1]:+.1f}]")
         table.append(row)
     st.subheader("Failure detail")
-    st.dataframe(pd.DataFrame(table), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
     st.caption("A failure rate describes your assumptions, not the future. With lifestyle tiers, "
                "spending adapts to income, so failure is rare; the Lifestyle tab shows the "
-               "budget each option sustains.")
+               "budget each option sustains. A cash crunch can be brief (a down payment, a job "
+               "gap) and recoverable; running out after 65 is the outcome to avoid.")
+
+    rw = [(res.scenario.name, runway_metrics(res)) for res in results]
+    rw = [(n, m) for n, m in rw if m]
+    if rw:
+        st.subheader("Startup runway")
+        st.dataframe(pd.DataFrame([{
+            "Option": n,
+            "Runway years": f"age {a0 + m['window'][0]} to {a0 + m['window'][1]}",
+            "Cash at start (median)": m["cash_at_start"],
+            "Peak cash (median)": m["peak_cash"],
+            "Cash ran out": m["p_cash_out"],
+            "Liquid assets ran out": m["p_broke"],
+        } for n, m in rw]), hide_index=True, width="stretch", column_config={
+            "Cash at start (median)": st.column_config.NumberColumn(format="$%,.0f"),
+            "Peak cash (median)": st.column_config.NumberColumn(format="$%,.0f"),
+            "Cash ran out": st.column_config.NumberColumn(format="percent"),
+            "Liquid assets ran out": st.column_config.NumberColumn(format="percent"),
+        })
+        st.caption("Founder careers have a runway window. Add a runway life event (4 or 2 "
+                   "years in cash) to hold it in cash; without one, the founding years are paid "
+                   "by selling investments, so 'cash ran out' is expected and only 'liquid "
+                   "assets ran out' is a real failure.")
 
 
 # ----------------------------------------------------------------------------
@@ -812,7 +866,7 @@ with tabs["Milestones"]:
                 for m in next(iter(inc_ms.values()))]
         st.dataframe(pd.DataFrame([{"Option": n, **{c: _cell(m) for c, m in zip(cols, ms)}}
                                    for n, ms in inc_ms.items()]),
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
         st.caption("Gross equivalents use the scenario's tax table (single filer, California). "
                    "One-time windfalls such as an exit payout are not take-home pay; they count "
                    "toward net worth.")
@@ -823,7 +877,7 @@ with tabs["Milestones"]:
             for m in next(iter(nw_ms.values()))]
     st.dataframe(pd.DataFrame([{"Option": n, **{c: _cell(m) for c, m in zip(cols, ms)}}
                                for n, ms in nw_ms.items()]),
-                 hide_index=True, use_container_width=True)
+                 hide_index=True, width="stretch")
     st.caption(f"The bracket is the perpetual dividend: what that portfolio could pay you every "
                f"year at {100 * wr:.2f}% if you stopped working, before tax, in today's dollars.")
 
@@ -846,7 +900,7 @@ with tabs["Milestones"]:
             tooltip=["scenario:N", alt.Tooltip("x:Q", title=x_title),
                      alt.Tooltip("p:Q", format=".0%", title="Reached")],
         ).properties(height=300),
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -873,7 +927,7 @@ with tabs["Lifestyle"]:
             {t.name + f" (≥{money(t.take_home)})": [dict(t.monthly).get(c, np.nan) for c in cats]
              + [sum(a for _, a in t.monthly), 12 * sum(a for _, a in t.monthly)] for t in ls.tiers})
         st.subheader("Tier budgets")
-        st.dataframe(budget, hide_index=True, use_container_width=True,
+        st.dataframe(budget, hide_index=True, width="stretch",
                      column_config={c: st.column_config.NumberColumn(c, format="$%,.0f")
                                     for c in budget.columns if c != "Category"})
 
@@ -897,7 +951,7 @@ with tabs["Lifestyle"]:
                          alt.Tooltip("share:Q", format=".0%")],
             ).transform_calculate(tier_order=f"indexof({list(shares)}, datum.tier)")
             .properties(height=300),
-            use_container_width=True,
+            width="stretch",
         )
 
         st.subheader("Yearly spending by category")
@@ -913,7 +967,7 @@ with tabs["Lifestyle"]:
                 tooltip=["category:N", alt.Tooltip("x:Q", title=x_title),
                          alt.Tooltip("amount:Q", format="$,.0f")],
             ).properties(height=300),
-            use_container_width=True,
+            width="stretch",
         )
 
         rows = []
@@ -928,7 +982,7 @@ with tabs["Lifestyle"]:
                     row[f"Most common at {age}"] = f"{best} ({100 * sh[best][t]:.0f}%)"
             rows.append(row)
         st.subheader("Most common tier by age")
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
 # ----------------------------------------------------------------------------
@@ -967,7 +1021,7 @@ with tabs["Hours"]:
                      alt.Tooltip("mean:Q", format=".1f", title="Mean h/wk")])
         ref = alt.Chart(pd.DataFrame({"y": [40]})).mark_rule(strokeDash=[4, 4], color="gray"
                                                               ).encode(y="y:Q")
-        show_chart(alt.layer(band, line, ref).properties(height=320), use_container_width=True)
+        show_chart(alt.layer(band, line, ref).properties(height=320), width="stretch")
         st.caption("Dashed line: a 40-hour week. Options with uncertain paths (admission, "
                    "tenure, partnership) mix outcomes in the median; the shaded band shows the spread.")
 
@@ -983,7 +1037,7 @@ with tabs["Hours"]:
             rows.append(row)
         df = pd.DataFrame(rows)
         st.subheader("Time cost of each option")
-        st.dataframe(df, hide_index=True, use_container_width=True, column_config={
+        st.dataframe(df, hide_index=True, width="stretch", column_config={
             "Lifetime work hours (median)": st.column_config.NumberColumn(format="%,.0f"),
             "Years working (median)": st.column_config.NumberColumn(format="%.0f"),
             "Lifetime take-home (median)": st.column_config.NumberColumn(format="$%,.0f"),
@@ -993,6 +1047,27 @@ with tabs["Hours"]:
         })
         st.caption("Take-home per work hour = lifetime take-home pay ÷ lifetime work hours "
                    "(Ph.D., school and training years included).")
+
+        st.subheader("Free time")
+        commute = st.slider("Commute (hours a week, while working)", 0.0, 15.0, 4.5, 0.5,
+                            help="US average: about 27 minutes each way (Census ACS), ~4.5 "
+                                 "hours a week.")
+        ft_rows = []
+        for r in hour_res:
+            ft = free_time(r, commute)
+            ft_rows.append({"Option": ft.name, "Lifetime free hours": ft.lifetime_free,
+                            "Free hours before 65": ft.free_before_65,
+                            "Years not working after the Ph.D.": ft.retired_years,
+                            "Share of waking hours free": ft.free_share})
+        st.dataframe(pd.DataFrame(ft_rows), hide_index=True, width="stretch", column_config={
+            "Lifetime free hours": st.column_config.NumberColumn(format="%,.0f"),
+            "Free hours before 65": st.column_config.NumberColumn(format="%,.0f"),
+            "Years not working after the Ph.D.": st.column_config.NumberColumn(format="%.0f"),
+            "Share of waking hours free": st.column_config.NumberColumn(format="percent"),
+        })
+        st.caption("Free hours = 16 waking hours a day minus work and commuting, with 4 weeks a "
+                   "year off, from now to the end of the plan. Chores, sleep beyond 8 hours and "
+                   "caregiving are not taken out, so compare the options rather than the totals.")
 
         st.subheader("Where the hours come from")
         hour_files = ([career_file] if mode == "Strategies" else
@@ -1044,7 +1119,7 @@ if profile_file:
             })
         sdf = pd.DataFrame(rows)
         st.subheader("Ranking")
-        st.dataframe(sdf, hide_index=True, use_container_width=True, column_config={
+        st.dataframe(sdf, hide_index=True, width="stretch", column_config={
             "Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100,
                                                      format="%.0f"),
             "Financial": st.column_config.NumberColumn(format="%.0f"),
@@ -1098,7 +1173,7 @@ if profile_file:
         labels = alt.Chart(pdf).mark_text(align="left", dx=8, dy=-6, fontSize=11).encode(
             x=enc_x, y=enc_y, text="label:N")
         show_chart(alt.layer(fline, dots, labels).properties(height=380),
-                   use_container_width=True)
+                   width="stretch")
         st.caption("Each option on the frontier is the best available for some trade-off between "
                    "the two axes: nothing else beats it on both. An option beaten on both is "
                    "worth picking only for reasons outside these scores.")
@@ -1173,8 +1248,8 @@ with tabs["Cash flow"]:
         v = val(fm["spending"], k)
         link(take, k, v)
         spend_total += max(v, 0.0)
-    for k in ("One-time purchases", "Loan payments"):
-        link(take, k, other[k])
+    for k in ("One-time purchases", "Loan payments", "Home costs"):
+        link(take, k, other.get(k, 0.0))
     saved = float(fm["saved"][t]) - nonspend
     if saved > 0:
         link(take, "Saved", saved)
@@ -1205,7 +1280,7 @@ with tabs["Cash flow"]:
                       font=dict(size=12))
     st.subheader(f"Where a year's money goes at {age_cf}")
     st.caption(f"{pick_cf}, average across paths, today's dollars.")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     income_total = sum(incomes.values())
     if income_total > 0:
@@ -1215,7 +1290,7 @@ with tabs["Cash flow"]:
             {"": "Taxes", "$/yr": tax_total, "Share": tax_total / income_total},
             {"": "Spending", "$/yr": spend_total, "Share": spend_total / income_total},
             {"": "Saved (incl. employer match)", "$/yr": kept, "Share": kept / income_total},
-        ]), hide_index=True, use_container_width=True, column_config={
+        ]), hide_index=True, width="stretch", column_config={
             "$/yr": st.column_config.NumberColumn(format="$%,.0f"),
             "Share": st.column_config.NumberColumn(format="percent")})
         st.caption("Averages across paths can mix outcomes, such as admitted and not-admitted "
@@ -1233,7 +1308,9 @@ def show_info(f: Path, expanded: bool) -> None:
             st.write(info["description"])
         if info["assumptions"]:
             st.markdown("**Assumptions**")
-            st.markdown("\n".join(f"- {a}" for a in info["assumptions"]))
+            st.markdown("\n".join(
+                f"- :orange-badge[Low confidence] {a.replace('(CHECK)', '').replace('CHECK: ', '').replace(' CHECK', '').replace('CHECK', '')}"
+                if "CHECK" in a else f"- {a}" for a in info["assumptions"]))
         if info["sources"]:
             st.markdown("**Sources**")
             st.markdown("\n".join(f"- {s}" for s in info["sources"]))
@@ -1300,12 +1377,12 @@ with tab_sens:
         rule = alt.Chart(pd.DataFrame({"x": [base_p]})).mark_rule(color="black").encode(x="x:Q")
         st.subheader(f"What moves the failure rate (base {100 * base_p:.1f}%)")
         show_chart((chart + rule).properties(height=26 * len(rows) + 40),
-                        use_container_width=True)
+                        width="stretch")
         st.dataframe(pd.DataFrame([{
             "Input": r.knob.label, "Low": r.knob.low_desc, "P(fail) low": f"{100 * r.p_low:.1f}%",
             "High": r.knob.high_desc, "P(fail) high": f"{100 * r.p_high:.1f}%",
             "Swing (pts)": round(100 * r.swing, 1),
-        } for r in sa.rows]), hide_index=True, use_container_width=True)
+        } for r in sa.rows]), hide_index=True, width="stretch")
         st.caption("Compare swings within one kind of nudge: a 10% salary change and a "
                    "1-point return change are different-sized questions.")
 
@@ -1313,6 +1390,60 @@ with tab_sens:
 # ----------------------------------------------------------------------------
 # Files
 # ----------------------------------------------------------------------------
+
+with tab_sens:
+    st.divider()
+    st.subheader("Break-even finder")
+    st.markdown("What would have to be true for one option to match another? Pick an input of "
+                "option A and the finder searches for the value at which A's yardstick equals "
+                "B's, re-running A on the same random draws.")
+    by_name = {r.scenario.name: r.scenario for r in results}
+    opt_names = list(by_name)
+    if len(opt_names) < 2:
+        st.info("Compare at least two options to use the break-even finder.")
+    else:
+        default_a = next((i for i, n in enumerate(opt_names) if "electrophysiologist" in n), 0)
+        b1, b2 = st.columns(2)
+        a_name = b1.selectbox("Option A (the one to adjust)", opt_names, index=default_a,
+                              key="be_a")
+        b_choices = [n for n in opt_names if n != a_name]
+        b_name = b2.selectbox("Option B (the benchmark)", b_choices, key="be_b")
+        lv = be_levers(by_name[a_name])
+        default_l = next((i for i, x in enumerate(lv) if "attending" in x.label.lower()
+                          or "acquired" in x.label.lower()), 0)
+        lever = st.selectbox("Input of option A to solve for", lv, index=default_l,
+                             format_func=lambda x: f"{x.label}: now {money(x.value)}", key="be_l")
+        b3, b4 = st.columns(2)
+        metric = b3.selectbox("Yardstick", list(BE_METRICS), index=0, key="be_m",
+                              help="Median: the typical path. Mean: includes rare big outcomes. "
+                                   "P10: a bad-luck path.")
+        be_age = b4.slider("At age", a0 + 10, a0 + base.horizon_years, min(65, a0 + base.horizon_years),
+                           key="be_age")
+        if st.button("Find the break-even", type="primary"):
+            with st.spinner("Searching (about 20 runs at 2,000 paths)..."):
+                be = be_solve(by_name[a_name], by_name[b_name], lever, metric, be_age)
+            st.session_state["be_result"] = (a_name, b_name, be)
+        saved = st.session_state.get("be_result")
+        if saved and saved[0] == a_name and saved[1] == b_name and saved[2].lever == lever.label:
+            _, _, be = saved
+            c1, c2, c3 = st.columns(3)
+            c1.metric(f"B: {metric.lower()}", money(be.target))
+            c2.metric(f"A as written", money(be.base_metric))
+            c3.metric("Break-even input", "none in range" if be.value is None else money(be.value),
+                      None if be.value is None else f"{100 * (be.value / be.base_value - 1):+.0f}% vs now")
+            st.caption(be.note + (f" This input only applies on {100 * be.reach:.0f}% of option "
+                                  "A's paths, so the median may not move much however large it "
+                                  "gets; try the mean." if be.reach < 0.5 else ""))
+            cdf = pd.DataFrame(be.curve, columns=["input", "metric"])
+            line = alt.Chart(cdf).mark_line(point=True).encode(
+                x=alt.X("input:Q", title=lever.label, axis=alt.Axis(format="$,.2s")),
+                y=alt.Y("metric:Q", title=f"A: {metric.lower()} at {be_age}",
+                        axis=alt.Axis(format="$,.2s")))
+            ref = alt.Chart(pd.DataFrame({"y": [be.target]})).mark_rule(
+                strokeDash=[5, 4], color="gray").encode(y="y:Q")
+            show_chart(alt.layer(line, ref).properties(height=280), width="stretch")
+            st.caption("Dashed line: option B. Each dot is one re-run of option A.")
+
 
 with tab_files:
     if profile_file:

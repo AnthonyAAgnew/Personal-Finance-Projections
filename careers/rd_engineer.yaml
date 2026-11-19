@@ -15,7 +15,7 @@ sources:
 
 assumptions:
   - "Enters at $150k total pay (between Medtronic senior and principal; a Ph.D. plus prior J&J years usually places above the BLS 90th percentile of all biomedical engineers)."
-  - "Real raises average 1%/yr (above inflation; late-career raises flatten); promotion to senior principal or manager around age 33 (±2 yrs) at $195k."
+  - "Real raises average 1%/yr (above inflation; late-career raises flatten); promotion to senior principal or manager around age 35 (±2 yrs) at $195k."
   - "3% yearly chance of a layoff gap costing 40% of that year's pay."
   - "Employer 401(k) match about 6% of pay."
   - "Hours: 44/week, between the 43 (CSE 2024) and 45 (EMI) engineering survey averages. No biomedical-specific survey was found."
@@ -24,7 +24,7 @@ assumptions:
 income:
   - name: Career pay
     amount: 150000
-    start_year: 2
+    start_year: 4
     growth: {mean: 0.01, stdev: 0.03}
     noise: 0.05                 # bonus swings
     loss_probability: 0.03
@@ -33,19 +33,20 @@ income:
   - name: Employer 401(k) match
     spendable: false            # goes straight into savings
     amount: 9000
-    start_year: 2
+    start_year: 4
     end_year: 43
     growth: {mean: 0.02, stdev: 0.0}
 
 time:
-  - {name: Work hours, amount: 44, start_year: 2}
+  - {name: Work hours, amount: 44, start_year: 4}
 
 events:
   - name: Promotion to senior principal
+    confidence: medium
     type: set_amount
     target: Career pay
     amount: 195000
-    year: 10
+    year: 12
     jitter: 2
 
 # Non-financial scores for the Decide tab (see sources and assumptions).

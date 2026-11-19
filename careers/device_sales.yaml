@@ -14,8 +14,8 @@ sources:
 
 assumptions:
   - "Years 1-2 as a clinical specialist / associate rep: ~$100k total."
-  - "Own territory around age 27 (±1): ~$155k total, slightly above the all-medical-sales average because device reps earn more."
-  - "25% chance of becoming a top performer (~$260k) around age 31; the rest stay near average."
+  - "Own territory around age 29 (±1): ~$155k total, slightly above the all-medical-sales average because device reps earn more."
+  - "25% chance of becoming a top performer (~$260k) around age 33; the rest stay near average."
   - "Commission swings ±20% a year (noise 0.20). 6% yearly chance of losing the job or territory (half a year's pay lost)."
   - "Employer 401(k) match about 6% of base."
   - "Hours: 52/week including travel, case coverage and admin (Repertoire 2015 field plus admin hours; O*NET: 79% of reps work 40+)."
@@ -24,7 +24,7 @@ assumptions:
 income:
   - name: Career pay
     amount: 100000
-    start_year: 2
+    start_year: 4
     growth: {mean: 0.01, stdev: 0.05}
     noise: 0.20
     loss_probability: 0.06
@@ -33,25 +33,25 @@ income:
   - name: Employer 401(k) match
     spendable: false            # goes straight into savings
     amount: 5700
-    start_year: 2
+    start_year: 4
     end_year: 43
     growth: {mean: 0.015, stdev: 0.0}
 
 time:
-  - {name: Work hours, amount: 52, start_year: 2}
+  - {name: Work hours, amount: 52, start_year: 4}
 
 events:
   - name: Own territory
     type: set_amount
     target: Career pay
     amount: 155000
-    year: 4
+    year: 6
     jitter: 1
   - name: Top performer
     type: set_amount
     target: Career pay
     amount: 260000
-    year: 8
+    year: 10
     jitter: 2
     probability: 0.25
 

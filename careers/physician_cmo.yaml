@@ -10,15 +10,15 @@ sources:
   - "Device CMO postings: base ~$200k-$450k plus bonus and equity (JRG Partners): https://www.jrgpartners.com/?p=33911"
 
 assumptions:
-  - "Around age 34 (about 3-5 years after residency), move to industry as a medical director at ~$330k total."
-  - "40% chance of becoming CMO around age 40 (+-2) at ~$520k total (base + bonus; equity not modeled). CHECK"
+  - "Around age 36 (about 3-5 years after residency), move to industry as a medical director at ~$330k total."
+  - "40% chance of becoming CMO around age 42 (+-2) at ~$520k total (base + bonus; equity not modeled). CHECK"
   - "Hours: 50 as medical director, 55 as CMO (CHECK: no survey found; set near the physician average of 50)."
   - "Autonomy 72 (Medical and Health Services Managers). Burnout 40% (CHECK: industry roles have less clinical load). Satisfaction 73%."
 
 events:
-  - {name: Moves to industry (medical director), type: set_amount, target: Career pay, amount: 330000, same_time_as: Admitted to med school, offset: 12}
+  - {name: Moves to industry (medical director), type: set_amount, target: Career pay, amount: 330000, same_time_as: Admitted to med school, offset: 12, confidence: medium}
   - {name: Industry hours, type: set_amount, target: Work hours, amount: 50, same_time_as: Moves to industry (medical director)}
-  - {name: Becomes CMO, type: set_amount, target: Career pay, amount: 520000, same_time_as: Moves to industry (medical director), offset: 6, jitter: 2, probability: 0.4}
+  - {name: Becomes CMO, type: set_amount, target: Career pay, amount: 520000, same_time_as: Moves to industry (medical director), offset: 6, jitter: 2, probability: 0.4, confidence: low}
   - {name: CMO hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Becomes CMO}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).

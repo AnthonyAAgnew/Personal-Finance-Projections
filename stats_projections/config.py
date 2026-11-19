@@ -53,6 +53,14 @@ class Stream:
     noise: float = 0.0  # year-to-year swing that does not compound (bonus, commission)
     taxable: bool = False  # True: amount is gross pay, taxed with the scenario's taxes
     spendable: bool = True  # False: goes straight to savings (employer 401(k) match)
+    # How sure the number is: high = as written; medium / low = the stream's
+    # whole level is uncertain per path (lognormal, sigma from CONFIDENCE).
+    confidence: str = "high"
+
+
+# Lognormal sigma added for each confidence level (streams: a persistent
+# per-path level factor; events: extra spread on the amount).
+CONFIDENCE = {"high": 0.0, "medium": 0.10, "low": 0.25}
 
 
 @dataclass(frozen=True)
@@ -102,7 +110,46 @@ class Lifestyle:
         return tuple(seen)
 
 
-EVENT_TYPES = ("purchase", "windfall", "set_amount", "loan", "scale")
+EVENT_TYPES = ("purchase", "windfall", "set_amount", "loan", "scale", "home")
+
+
+@dataclass(frozen=True)
+class Equity:
+    """Founder proceeds from a company sale, worked out from the cap table.
+
+    The sale price is lognormal (median ``sale_median``). Your stake starts at
+    ``founder_share``, is diluted by the option pool and by each funding round
+    in ``dilution``. Investors hold 1x non-participating preferred for
+    ``raised`` dollars: they take the larger of their money back or their
+    share of the price; common holders (founders and the pool) split the rest.
+    Tax: ``state_rate`` on all of it, ``federal_rate`` on the part above the
+    federal QSBS exclusion ``qsbs_cap`` (0 = no exclusion).
+    """
+
+    sale_median: float
+    sale_spread: float = 1.0
+    founder_share: float = 0.5
+    option_pool: float = 0.10
+    dilution: tuple[float, ...] = ()
+    raised: float = 0.0
+    qsbs_cap: float = 0.0
+    federal_rate: float = 0.238
+    state_rate: float = 0.133
+
+    @property
+    def stake(self) -> float:
+        s = self.founder_share * (1 - self.option_pool)
+        for d in self.dilution:
+            s *= 1 - d
+        return s
+
+    @property
+    def common(self) -> float:
+        """Share held by all common (founders + pool) after the rounds."""
+        c = 1.0
+        for d in self.dilution:
+            c *= 1 - d
+        return c
 
 
 @dataclass(frozen=True)
@@ -161,6 +208,9 @@ class Strategy:
     coast_factor: float = 0.5
     expected_real_return: float = 0.045
     target_year: int = 43  # the profile's retirement year (age 65 from 22)
+    # coast only: "reduce" scales pay and hours by coast_factor; "stop_saving"
+    # keeps working but stops adding to savings (true Coast FIRE).
+    coast_mode: str = "reduce"
 
 
 @dataclass(frozen=True)
@@ -209,6 +259,14 @@ class Event:
     term: int = 10
     defer: int = 0
     factor: float = 1.0  # scale events: multiply the target stream from this year on
+    confidence: str = "high"  # medium / low widen the amount (see CONFIDENCE)
+    equity: Equity | None = None  # windfall: proceeds from a cap table instead of amount
+    # home: buy a home worth ``amount`` with ``down`` paid in cash and the
+    # rest as a mortgage (``rate``, ``term``); ``owner_costs`` x price a year
+    # (property tax, insurance, upkeep); value grows by ``appreciation``.
+    down: float = 0.2
+    owner_costs: float = 0.0
+    appreciation: Growth = Growth()
 
 
 @dataclass(frozen=True)
@@ -231,6 +289,33 @@ class Inflation:
 
 
 @dataclass(frozen=True)
+class Cash:
+    """A cash reserve kept apart from the invested portfolio.
+
+    Savings first top the reserve up to ``reserve_months`` of spending, the
+    rest is invested; shortfalls come out of cash first. Inside
+    ``runway_window`` (years [start, end)), the target is ``runway_months``
+    instead: a startup runway built up beforehand and spent during it.
+    """
+
+    balance: float = 0.0
+    reserve_months: float = 0.0
+    mean: float = 0.03  # nominal yield
+    stdev: float = 0.01
+    runway_months: float = 0.0
+    runway_window: tuple[int, int] | None = None
+
+
+@dataclass(frozen=True)
+class Bonds:
+    """Bond returns for the glide path (nominal), correlated with stocks."""
+
+    mean: float = 0.045
+    stdev: float = 0.07
+    correlation: float = 0.1
+
+
+@dataclass(frozen=True)
 class Scenario:
     name: str
     horizon_years: int
@@ -250,6 +335,12 @@ class Scenario:
     time: tuple[Stream, ...] = ()  # work hours per week (amount = hours, not dollars)
     strategy: Strategy | None = None
     quality: Quality | None = None
+    cash: Cash | None = None
+    bonds: Bonds | None = None
+    # ((year, stock share), ...), linearly interpolated; empty = all in returns.
+    allocation: tuple[tuple[int, float], ...] = ()
+    # ((year, stock return delta, inflation delta), ...): market stress tests.
+    stress: tuple[tuple[int, float, float], ...] = ()
     source: Path | None = field(default=None, compare=False)
 
     def stream(self, name: str) -> Stream:
@@ -403,7 +494,7 @@ def _stream(kind: str, data: dict, horizon: int) -> Stream:
         data,
         {"name", "amount", "start_year", "end_year", "growth",
          "loss_probability", "loss_fraction", "noise", "taxable", "spendable", "monthly",
-         "remove", "note"},
+         "confidence", "remove", "note"},
     )
     if ("amount" in data) == ("monthly" in data):
         raise ScenarioError(f"{where}: give exactly one of 'amount' (per year) or 'monthly'")
@@ -419,7 +510,10 @@ def _stream(kind: str, data: dict, horizon: int) -> Stream:
         noise=float(data.get("noise", 0.0)),
         taxable=bool(data.get("taxable", False)),
         spendable=bool(data.get("spendable", True)),
+        confidence=str(data.get("confidence", "high")),
     )
+    if s.confidence not in CONFIDENCE:
+        raise ScenarioError(f"{where}: confidence must be one of {tuple(CONFIDENCE)}")
     if s.amount < 0:
         raise ScenarioError(f"{where}: amount must be >= 0 (use expenses for outflows)")
     if s.noise < 0:
@@ -433,6 +527,33 @@ def _stream(kind: str, data: dict, horizon: int) -> Stream:
     return s
 
 
+def _equity(where: str, data: Any) -> Equity | None:
+    if not data:
+        return None
+    _check_keys(f"{where} equity", data, set(Equity.__dataclass_fields__))
+    d = dict(data)
+    d["dilution"] = tuple(float(x) for x in d.get("dilution", ()) or ())
+    eq = Equity(**{k: (v if k == "dilution" else float(v)) for k, v in d.items()})
+    shares = (eq.founder_share, eq.option_pool, *eq.dilution)
+    if eq.sale_median <= 0 or any(not 0 <= x < 1 + 1e-12 for x in shares) or eq.raised < 0:
+        raise ScenarioError(f"{where} equity: sale_median > 0, shares in [0, 1], raised >= 0")
+    return eq
+
+
+def _cash(data: Any) -> Cash | None:
+    if not data:
+        return None
+    _check_keys("portfolio.cash", data, set(Cash.__dataclass_fields__))
+    d = dict(data)
+    if d.get("runway_window") is not None:
+        a, b = d["runway_window"]
+        d["runway_window"] = (int(a), int(b))
+    c = Cash(**{k: (v if k == "runway_window" else float(v)) for k, v in d.items()})
+    if c.balance < 0 or c.reserve_months < 0 or c.runway_months < 0:
+        raise ScenarioError("portfolio.cash: balance and months must be >= 0")
+    return c
+
+
 def _event(data: dict) -> Event:
     where = f"event '{data.get('name', '?')}'"
     _check_keys(
@@ -440,7 +561,8 @@ def _event(data: dict) -> Event:
         data,
         {"name", "type", "year", "amount", "target", "jitter", "same_time_as", "offset",
          "probability", "group", "spread", "tax_rate", "duration", "rate", "term", "defer",
-         "factor", "remove", "note"},
+         "factor", "confidence", "equity", "down", "owner_costs", "appreciation",
+         "remove", "note"},
     )
     e = Event(
         name=str(data["name"]),
@@ -460,7 +582,19 @@ def _event(data: dict) -> Event:
         term=int(data.get("term", 10)),
         defer=int(data.get("defer", 0)),
         factor=float(data.get("factor", 1.0)),
+        confidence=str(data.get("confidence", "high")),
+        equity=_equity(where, data.get("equity")),
+        down=float(data.get("down", 0.2)),
+        owner_costs=float(data.get("owner_costs", 0.0)),
+        appreciation=_growth(f"{where} appreciation", data.get("appreciation")),
     )
+    if e.confidence not in CONFIDENCE:
+        raise ScenarioError(f"{where}: confidence must be one of {tuple(CONFIDENCE)}")
+    if e.equity is not None and e.type != "windfall":
+        raise ScenarioError(f"{where}: equity only applies to windfall events")
+    if e.type == "home" and (e.amount <= 0 or not 0 < e.down <= 1 or e.term < 1
+                             or e.rate < 0 or e.owner_costs < 0):
+        raise ScenarioError(f"{where}: home needs amount > 0, down in (0, 1], term >= 1")
     if e.factor < 0:
         raise ScenarioError(f"{where}: factor must be >= 0")
     if e.type not in EVENT_TYPES:
@@ -515,6 +649,8 @@ def _strategy(data: Any) -> Strategy | None:
     if "stop" in d:
         d["stop"] = tuple(d["stop"] or ())
     st = Strategy(**d)
+    if st.coast_mode not in ("reduce", "stop_saving"):
+        raise ScenarioError("strategy.coast_mode must be reduce or stop_saving")
     if st.kind not in STRATEGY_KINDS:
         raise ScenarioError(f"strategy.kind must be one of {STRATEGY_KINDS}")
     if st.multiple <= 0 or not 0 <= st.coast_factor <= 1:
@@ -607,7 +743,8 @@ def from_dict(raw: dict) -> Scenario:
         raise ScenarioError("horizon_years and paths must be positive")
 
     portfolio = raw.get("portfolio", {}) or {}
-    _check_keys("portfolio", portfolio, {"starting_balance", "returns", "inflation"})
+    _check_keys("portfolio", portfolio, {"starting_balance", "returns", "inflation", "cash",
+                                         "bonds", "allocation", "stress"})
     r = portfolio.get("returns", {}) or {}
     _check_keys("portfolio.returns", r, set(Returns.__dataclass_fields__))
     returns = Returns(**r)
@@ -624,6 +761,16 @@ def from_dict(raw: dict) -> Scenario:
     inflation = Inflation(**i)
     if not -1 <= inflation.correlation <= 1:
         raise ScenarioError("portfolio.inflation.correlation must be in [-1, 1]")
+    b = portfolio.get("bonds")
+    if b:
+        _check_keys("portfolio.bonds", b, set(Bonds.__dataclass_fields__))
+    bonds = Bonds(**{k: float(v) for k, v in b.items()}) if b else None
+    allocation = tuple((int(y), float(x)) for y, x in portfolio.get("allocation", ()) or ())
+    if allocation and (bonds is None or any(not 0 <= x <= 1 for _, x in allocation)):
+        raise ScenarioError("portfolio.allocation needs portfolio.bonds and stock shares in [0, 1]")
+    if allocation and returns.model == "bootstrap":
+        raise ScenarioError("portfolio.allocation is not supported with bootstrap returns")
+    stress = tuple((int(y), float(a), float(c)) for y, a, c in portfolio.get("stress", ()) or ())
 
     income = tuple(_stream("income", d, horizon) for d in raw.get("income", []) or [])
     expenses = tuple(_stream("expense", d, horizon) for d in raw.get("expenses", []) or [])
@@ -672,4 +819,8 @@ def from_dict(raw: dict) -> Scenario:
         time=time,
         strategy=_strategy(raw.get("strategy")),
         quality=_quality(raw.get("quality")),
+        cash=_cash(portfolio.get("cash")),
+        bonds=bonds,
+        allocation=allocation,
+        stress=stress,
     )

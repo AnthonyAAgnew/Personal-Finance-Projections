@@ -1,0 +1,18 @@
+extends: cardiology_ep.yaml
+name: Cardiac EP (no debt, full scholarship)
+description: >
+  The EP path with medical school fully paid for (a full-ride or tuition-free
+  school), so no loans. A best case to compare with the borrowed path.
+
+assumptions:
+  - "Full scholarship covers tuition and living costs: no tuition outflow and no loans. Service scholarships (HPSP, NHSC) also pay but require service years afterwards (not modeled)."
+
+events:
+  - {name: Med school year 1, remove: true}
+  - {name: Med school year 2, remove: true}
+  - {name: Med school year 3, remove: true}
+  - {name: Med school year 4, remove: true}
+  - {name: Med loan year 1, remove: true}
+  - {name: Med loan year 2, remove: true}
+  - {name: Med loan year 3, remove: true}
+  - {name: Med loan year 4, remove: true}

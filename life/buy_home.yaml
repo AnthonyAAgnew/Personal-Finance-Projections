@@ -1,0 +1,32 @@
+name: Buy a home
+description: >
+  Buy a home around age 32 (+-2) with 20% down and a 30-year mortgage. Rent
+  stops; property tax, insurance and upkeep start. The home's value counts in
+  net worth (not in the portfolio you can spend), and the mortgage counts as
+  a loan.
+
+sources:
+  - "California Prop 13: property tax is 1% of the purchase price plus local levies (often ~1.1-1.2% in Orange County) (via search)"
+  - "Case-Shiller US home price index: long-run real appreciation roughly 0.5-1% a year (via search)"
+
+assumptions:
+  - "Price $1.1M (an Irvine townhome or condo, CHECK: check current listings)."
+  - "20% down plus ~2% closing costs, paid from savings (about $240k). If savings fall short, the gap shows as a cash crunch: move the year later."
+  - "Mortgage at 6.5% nominal over 30 years, repaid in level real payments (CHECK: check current rates)."
+  - "Owner costs 2.2% of the price a year: property tax ~1.1%, insurance ~0.3%, upkeep ~0.8% (CHECK)."
+  - "Value grows 1% a year above inflation on average, swinging +-5% a year (CHECK)."
+  - "Mortgage interest deductions and selling costs are not modeled."
+
+events:
+  - name: Buy a home
+    type: home
+    amount: 1100000
+    year: 10
+    jitter: 2
+    down: 0.20
+    rate: 0.065
+    term: 30
+    owner_costs: 0.022
+    appreciation: {mean: 0.01, stdev: 0.05}
+    confidence: medium
+  - {name: Rent ends, type: set_amount, target: Housing, amount: 0, same_time_as: Buy a home}
