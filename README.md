@@ -27,7 +27,7 @@ python -m streamlit run app.py
 - **Life scenarios mode:** the standalone files in `scenarios/`.
 - **What if:** edit a copy of the reference, then save the change as a small
   override file that `extends` it.
-- **Sensitivity:** a tornado chart for any option. Sidebar sliders change
+- **Sensitivity:** a tornado chart for any option. Simulation-settings sliders change
   the market assumptions for every option at once.
 
 ### Budget, lifestyle tiers, and milestones
@@ -60,7 +60,7 @@ python -m streamlit run app.py
   shortfalls come out of cash first.
 - **Glide path:** `portfolio.bonds` and `portfolio.allocation` blend stocks and
   bonds by year (90% stocks to 45, 60% at 65, 50% at 75 in the profile).
-- **Market scenarios** (sidebar): lost decade, high-inflation decade, crash in
+- **Market scenarios** (Simulation settings panel): lost decade, high-inflation decade, crash in
   your first career year, crash right after retiring, depression-level shock.
   Each lays fixed shocks over the same random paths (`stats_projections/stress.py`).
 - **Three failure types:** cash crunch (the old P(fail)), negative net worth
