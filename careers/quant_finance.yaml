@@ -5,22 +5,26 @@ description: >
   performance-based job risk; higher cost of living.
 
 sources:
+  - "Hours: eFinancialCareers 2025 salary and bonus report: quant finance staff average 47 hrs/week, hedge funds 51: https://www.efinancialcareers.com/news/hedge-fund-working-hours"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: Medius 2024 Financial Census (1,533 finance professionals): 55% report burnout: https://prnewswire.com/news-releases/overburdened-and-burnt-out-finance-teams-call-out-for-automation-to-address-lack-of-resources-driven-by-economic-uncertainty-medius-302206852.html"
   - "Jane Street new-grad quant researcher base $300k; Citadel Securities PhD graduate $235k-$300k + bonus (TraderMath / job postings): https://www.tradermath.org/salaries/quant-researcher"
   - "First-year total comp estimates ~$300k-$450k at top firms: https://www.tradermath.org/salaries/quant-compensation"
 
 assumptions:
   - "Assumes you land the offer (top firms are very selective)."
-  - "First-year total ~$350k; senior quant researcher around age 37 (~$600k); 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 41. CHECK"
+  - "First-year total ~$350k; senior quant researcher around age 30 (~$600k); 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 34. CHECK"
   - "Bonuses swing pay +-30% a year; 8% yearly chance of being cut (half a year's pay lost)."
   - "New York costs ~25% more than Irvine across the lifestyle budget, and rent ~60% more at the base budget. Taxes use the California table (NY state + NYC rates are similar at these incomes)."
-  - "~55 hours a week."
+  - "Hours: 47/week (eFinancialCareers 2025 quant average; hedge funds 51)."
+  - "Autonomy 71 (Financial Quantitative Analysts). Burnout 55% (Medius 2024 finance professionals). Satisfaction 65% (CHECK)."
 
 income:
   - {name: Career pay, amount: 350000, start_year: 2, growth: {mean: 0.01, stdev: 0.05}, noise: 0.30, loss_probability: 0.08, loss_fraction: 0.5, taxable: true}
-  - {name: Employer 401(k) match, amount: 12000, start_year: 2, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 12000, start_year: 2, end_year: 43, spendable: false}
 
 time:
-  - {name: Work hours, amount: 55, start_year: 2, growth: {mean: -0.004, stdev: 0.01}}
+  - {name: Work hours, amount: 47, start_year: 2}
 
 lifestyle:
   cost_index: [[2, 1.25]]
@@ -29,3 +33,6 @@ events:
   - {name: New York rent, type: scale, target: Housing, factor: 1.6, year: 2}
   - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, year: 6, jitter: 1}
   - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, year: 10, jitter: 2, probability: 0.2}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 71, satisfaction: 0.65, burnout: 0.55}

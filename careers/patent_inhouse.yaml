@@ -5,6 +5,10 @@ description: >
   BigLaw, much better hours, corporate bonus and stock.
 
 sources:
+  - "Hours: Wells Fargo Legal Specialty Group via Bloomberg Law: top-100 firm lawyers billed ~1,551 hours in 2023; firm targets are 1,900-2,200 billable (Harvest): https://news.bloomberglaw.com/us-law-week/less-work-more-money-big-law-associates-never-had-it-better"
+  - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
+  - "Burnout: Bloomberg Law 2024 Attorney Workload survey: attorneys burned out 42% of the time on average, mid/senior associates 51%: https://pro.bloomberglaw.com/insights/company-news/bloomberg-law-releases-attorney-workload-survey-insights-and-webinar-on-work-life-balance-solutions/"
+  - "Satisfaction: Axiom 2024 In-House Survey: 54% of in-house counsel report low satisfaction or are open to leaving: https://www.axiomlaw.com/hubfs/Downloadable%20Marketing%20Content/2024%20US%20In-House%20Survey%20Report.pdf"
   - "ABA Young Lawyers Division 2024 survey: median law school debt $112,500 (via Bankrate): https://bankrate.com/loans/student-loans/average-law-school-debt"
   - "Private law school tuition averages about $49k-$53k/yr in 2025-26 (aggregators citing ABA data): https://www.bestcolleges.com/research/law-school-cost/"
   - "LeanLaw citing AIPLA 2023 Economic Survey (private-practice medians, for comparison): https://www.leanlaw.co/blog/compensation-models-for-intellectual-property-law-firms-why-your-pay-structure-might-be-your-biggest-competitive-liability/"
@@ -12,14 +16,15 @@ sources:
 assumptions:
   - "Full-time JD in years 2-4 (ages 31-33) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
-  - "Three years at an IP firm at ~$200k, then in-house around age 37 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
-  - "35% chance of head of IP / chief IP counsel around age 45 at ~$420k. CHECK"
-  - "~52 hours a week at the firm, ~45 in-house."
+  - "Three years at an IP firm at ~$200k, then in-house around age 30 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
+  - "35% chance of head of IP / chief IP counsel around age 38 at ~$420k. CHECK"
+  - "Hours: 50 in law school (CHECK), 50 at the firm (~1,800 billable), 45 in-house (CHECK)."
+  - "Autonomy 92 (Lawyers). Burnout 38% (below the 42% attorney average, CHECK). Satisfaction 55% (Axiom 2024: 54% low satisfaction or open to leaving, CHECK)."
 
 income:
   - {name: Career pay, amount: 200000, start_year: 5, growth: {mean: 0.015, stdev: 0.03}, noise: 0.08, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
   - {name: Summer associate, amount: 40000, start_year: 3, end_year: 4, taxable: true}
-  - {name: Employer 401(k) match, amount: 10000, start_year: 5, end_year: 36, spendable: false}
+  - {name: Employer 401(k) match, amount: 10000, start_year: 5, end_year: 43, spendable: false}
 
 time:
   - {name: Work hours, amount: 50, start_year: 2}
@@ -31,7 +36,10 @@ events:
   - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 2}
   - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 3}
   - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 4}
-  - {name: Firm hours, type: set_amount, target: Work hours, amount: 52, year: 5}
+  - {name: Firm hours, type: set_amount, target: Work hours, amount: 50, year: 5}
   - {name: Joins in-house team, type: set_amount, target: Career pay, amount: 250000, year: 8, jitter: 1}
   - {name: In-house hours (patent counsel), type: set_amount, target: Work hours, amount: 45, same_time_as: Joins in-house team}
   - {name: Head of IP, type: set_amount, target: Career pay, amount: 420000, year: 16, jitter: 2, probability: 0.35}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 92, satisfaction: 0.55, burnout: 0.38}

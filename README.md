@@ -53,6 +53,18 @@ python -m streamlit run app.py
 - **Employer matches** use `spendable: false`, so they go straight to
   savings and are not take-home.
 
+### Decide: weighted scores and Pareto view
+
+- Eight criteria per option: net worth at 65 (median and P10), financial
+  independence age (portfolio reaches 25x spending), years working for under
+  $100k (school and training), lifetime work hours, autonomy, satisfaction and
+  burnout.
+- Each career file has a `quality:` line (autonomy from O*NET "Freedom to Make
+  Decisions", satisfaction and burnout as shares from surveys), with sources.
+- Weight sliders give a 0-100 score (relative to the options shown). The Pareto
+  chart plots a financial score against a life score, or any two criteria,
+  and marks the options nothing else beats on both.
+
 ### Life events, strategies, hours and debt
 
 - **Three ways to compare:**
@@ -80,7 +92,7 @@ python -m streamlit run app.py
   - Fat FIRE: 33x.
   - Coast FIRE: half pay and half hours once you can coast to 25x by 65.
   - Barista FIRE: 25% pay and hours.
-- **Hours:** each career has a `time:` schedule (hours per week) that events
+- **Hours:** each career sets hours per week for each phase from survey data (sources in each file and in the Hours tab), with one age taper (-5% at 50 and at 58) for everyone. Events
   and strategies change. The Hours tab shows hours by age, lifetime hours,
   average hours per week by decade, and take-home per work hour.
 - **Debt:** loans are tracked as balances. Net worth = portfolio minus loans

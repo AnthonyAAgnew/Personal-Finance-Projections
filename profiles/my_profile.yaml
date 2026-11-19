@@ -9,14 +9,18 @@ description: >
   2nd-year Ph.D. student at UC Irvine. 4 years at J&J before the Ph.D.
   B.S. Mechanical Engineering, M.S. BME, M.S. Statistics. Likely heading to
   med device engineering in industry.
-start_age: 29              # CHECK: your age today
-horizon_years: 66          # plan to age 95
+start_age: 22
+horizon_years: 73          # plan to age 95
 paths: 10000
 seed: 42
 failure_floor: 0
 borrowing_rate: 0.06       # real rate on any unplanned debt (credit, etc.)
 
 include: ../data/taxes_ca_single.yaml
+
+sources:
+  - "Hours: HEPI analysis of the Nature 2019 PhD survey: PhD students average 47 hrs/week: https://www.hepi.ac.uk/2020/06/25/new-report-shows-phd-students-work-50-more-than-undergraduates/"
+  - "Hours: BLS 2024: 11.1% of workers 25-54, 14.2% of 55-64 and 38.3% of 65+ work part time: https://www.bls.gov/opub/ted/2025/38-3-percent-of-employed-older-americans-worked-part-time-in-2024.htm"
 
 portfolio:
   starting_balance: 60000  # current net worth
@@ -38,7 +42,7 @@ income:
     taxable: true
   - name: Social Security
     amount: 36000          # CHECK: estimate at ssa.gov/myaccount; ~$36k is a high earner at 67
-    start_year: 38         # age 67
+    start_year: 45         # age 67
 
 # Budget categories, in today's dollars per month. These are your Ph.D.-era
 # amounts; the lifestyle tiers below raise them as your income grows.
@@ -54,7 +58,7 @@ expenses:
   - {name: Giving, monthly: 0}
   - name: Healthcare in retirement
     amount: 8000
-    start_year: 36
+    start_year: 43         # age 65
     growth: {mean: 0.02, stdev: 0.02}
 
 # Quality-of-life tiers. Each year your "affordable income" is your average
@@ -88,19 +92,27 @@ lifestyle:
                 Utilities & phone: 400, Fun & dining: 1600, Travel: 2000,
                 Shopping & other: 1200, Giving: 1200}
 
-# Work hours per week. Careers override "Work hours"; strategies (FIRE) and
-# events (school, residency) change it like any other stream.
+# Work hours per week. Careers set "Work hours" for each phase (school,
+# residency, associate, founder...) from survey data listed in each career
+# file; strategies (FIRE) change it like any other stream. Every career gets
+# the same age taper below and a 5% year-to-year swing.
 time:
   - name: Ph.D. hours
-    amount: 55             # CHECK
+    amount: 47             # Nature 2019 PhD survey (HEPI analysis): 47/week average
     end_year: 2
   - name: Work hours
     amount: 0
     start_year: 2
+    noise: 0.05
 
 events:
+  # Age taper: hours ease about 5% at 50 and another 5% at 58. BLS: part-time
+  # work rises from 11% of workers at 25-54 to 14% at 55-64 and 38% at 65+;
+  # CPS: physicians 36 and older work 50.7 hrs/week vs 54.1 under 36. CHECK
+  - {name: Hours ease at 50, type: scale, target: Work hours, factor: 0.95, year: 28}
+  - {name: Hours ease at 58, type: scale, target: Work hours, factor: 0.95, year: 36}
   - name: Retire
     type: set_amount
     target: [Career pay, Work hours]
     amount: 0
-    year: 36               # age 65
+    year: 43               # age 65

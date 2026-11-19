@@ -5,15 +5,21 @@ description: >
   academic medical center: lower clinical pay, teaching and research time.
 
 sources:
+  - "Hours: Iowa Board of Regents faculty activity report: faculty average 53.4 hrs/week, tenure-track 4-6 hours more than non-tenure-track: https://iowaregents.edu/news/newsletter/board-of-regents-news/november-2021-meeting-preview/faculty-activities-at-iowas-public-universities"
+  - "Burnout: 2024 faculty surveys: 64% feel burned out to some degree (HMS), 41% report burnout (WGU Labs): https://www.ecampusnews.com/campus-leadership/2024/02/27/faculty-burnout-is-at-an-all-time-high/"
   - "Medscape 2026 via Advisory Board (private-sector benchmark the discount is applied to): https://www.advisory.com/daily-briefing/2026/06/04/physician-compensation"
 
 assumptions:
   - "Academic attendings earn ~15-20% less than the Medscape averages: ~$250k primary care, ~$340k specialist. CHECK against the AAMC Faculty Salary Report (not found in search)."
-  - "~55 hours a week including research and teaching."
   - "Public Service Loan Forgiveness could cancel remaining federal loans after 10 years at a nonprofit hospital. Not modeled, so debt here is conservative."
+  - "Hours: 55 primary care, 57 specialist, between faculty surveys (~53) and practicing physicians (AMA 58.4), CHECK."
+  - "Autonomy 93 (between internal medicine physicians, 96, and engineering faculty, 90, CHECK). Burnout 50% (physicians' 47% plus faculty pressures, CHECK). Satisfaction 73%."
 
 events:
   - {name: Attending (primary care), amount: 250000}
   - {name: Attending (specialist), amount: 340000}
   - {name: Attending hours (primary care), amount: 55}
   - {name: Attending hours (specialist), amount: 57}
+
+# Non-financial scores for the Decide tab (see sources and assumptions).
+quality: {autonomy: 93, satisfaction: 0.73, burnout: 0.5}
