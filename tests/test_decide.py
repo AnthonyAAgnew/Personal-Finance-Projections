@@ -51,7 +51,7 @@ def test_normalize_flips_lower_is_better_and_fills_missing():
 
 def test_scores_rank_careers_and_respect_weights():
     rs = [simulate(compose(PROFILE, ROOT / "careers" / f"{c}.yaml", paths=300))
-          for c in ("rd_engineer", "quant_finance", "regulator")]
+          for c in ("rd_engineer", "tech_ai_health", "regulator")]
     money_only = {c.key: (1 if c.key == "wealth" else 0) for c in CRITERIA}
     ranked = score(rs, money_only)
     assert ranked[-1].name.startswith("Regulator")             # lowest median wealth

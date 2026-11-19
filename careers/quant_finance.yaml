@@ -12,9 +12,9 @@ sources:
   - "First-year total comp estimates ~$300k-$450k at top firms: https://www.tradermath.org/salaries/quant-compensation"
 
 assumptions:
-  - "Hiring odds (CHECK, low confidence): a 30% chance of an offer from a top trading firm (Jane Street, Citadel, Two Sigma tier), which take a small share of even strong Ph.D. applicants. Otherwise a quant role at a bank or smaller fund in New York at ~$200k, rising to ~$300k about 5 years in."
-  - "Assumes you land the offer (top firms are very selective)."
-  - "First-year total ~$350k; senior quant researcher around age 32 (~$600k); 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 36. CHECK"
+  - "Hiring odds (CHECK, low confidence): for a solid engineering/stats Ph.D. without a top-program pipeline, a 20% chance of an offer from a top trading firm (Jane Street, Citadel, Two Sigma tier); 40% a quant role at a bank or smaller fund in New York (~$200k, ~$300k about 5 years in); 40% no quant offer at all, landing in regular finance instead (risk, model validation or analytics at a bank in New York, ~$140k, ~$180k about 5 years in)."
+  - "Washing out (CHECK, low confidence): at a top firm, a 35% chance of being cut about 2 years in (moving to a bank or fund quant role at ~$220k); at a bank or fund, a 25% chance of being pushed out of quant about 3 years in (regular finance at ~$160k). Only ~13% of paths become a senior quant at a top firm."
+  - "Top-firm track: first-year total ~$350k; senior quant researcher around age 30 (~$600k); of those, 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 36. CHECK"
   - "Bonuses swing pay +-30% a year; 8% yearly chance of being cut (half a year's pay lost)."
   - "New York costs ~25% more than Irvine across the lifestyle budget, and rent ~60% more at the base budget. Taxes use the California table (NY state + NYC rates are similar at these incomes)."
   - "Hours: 47/week (eFinancialCareers 2025 quant average; hedge funds 51)."
@@ -32,11 +32,15 @@ lifestyle:
 
 events:
   - {name: New York rent, type: scale, target: Housing, factor: 1.6, year: 4}
-  - {name: Top-firm offer, type: set_amount, target: Career pay, amount: 350000, year: 4, group: hire, probability: 0.3, confidence: medium}
-  - {name: Bank or smaller fund instead, type: set_amount, target: Career pay, amount: 200000, year: 4, group: hire, probability: 0.7, confidence: medium}
-  - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, same_time_as: Top-firm offer, offset: 4, jitter: 1, confidence: medium}
-  - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, same_time_as: Top-firm offer, offset: 8, jitter: 2, probability: 0.2, confidence: low}
-  - {name: Senior quant (bank or fund), type: set_amount, target: Career pay, amount: 300000, same_time_as: Bank or smaller fund instead, offset: 5, jitter: 1, confidence: medium}
+  - {name: Top-firm offer, type: set_amount, target: Career pay, amount: 350000, year: 4, group: hire, probability: 0.2, confidence: low}
+  - {name: Bank or smaller fund instead, type: set_amount, target: Career pay, amount: 200000, year: 4, group: hire, probability: 0.4, confidence: medium}
+  - {name: No quant offer (regular finance), type: set_amount, target: Career pay, amount: 140000, year: 4, group: hire, probability: 0.4, confidence: medium}
+  - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, same_time_as: Top-firm offer, offset: 4, jitter: 1, group: top_stay, probability: 0.65, confidence: medium}
+  - {name: Cut from top firm (moves to bank or fund), type: set_amount, target: Career pay, amount: 220000, same_time_as: Top-firm offer, offset: 2, jitter: 1, group: top_stay, probability: 0.35, confidence: low}
+  - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, same_time_as: Senior quant researcher, offset: 4, jitter: 2, probability: 0.2, confidence: low}
+  - {name: Senior quant (bank or fund), type: set_amount, target: Career pay, amount: 300000, same_time_as: Bank or smaller fund instead, offset: 5, jitter: 1, group: bank_stay, probability: 0.75, confidence: medium}
+  - {name: Pushed out of quant (regular finance), type: set_amount, target: Career pay, amount: 160000, same_time_as: Bank or smaller fund instead, offset: 3, jitter: 2, group: bank_stay, probability: 0.25, confidence: low}
+  - {name: Regular finance senior role, type: set_amount, target: Career pay, amount: 180000, same_time_as: No quant offer (regular finance), offset: 5, jitter: 1, confidence: medium}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 71, satisfaction: 0.65, burnout: 0.55}
