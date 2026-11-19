@@ -53,8 +53,8 @@ def test_scores_rank_careers_and_respect_weights():
     rs = [simulate(compose(PROFILE, ROOT / "careers" / f"{c}.yaml", paths=300))
           for c in ("rd_engineer", "quant_finance", "regulator")]
     money_only = {c.key: (1 if c.key == "wealth" else 0) for c in CRITERIA}
-    best = score(rs, money_only)[0]
-    assert best.name.startswith("Quantitative finance")
+    ranked = score(rs, money_only)
+    assert ranked[-1].name.startswith("Regulator")             # lowest median wealth
     calm = {c.key: (1 if c.key in ("hours",) else 0) for c in CRITERIA}
     assert score(rs, calm)[0].name.startswith("Regulator")     # fewest hours
 

@@ -20,6 +20,7 @@ borrowing_rate: 0.06       # real rate on any unplanned debt (credit, etc.)
 include: ../data/taxes_ca_single.yaml
 
 sources:
+  - "SSA: 2025 PIA bend points $1,226 and $7,391 a month (90% / 32% / 15%); 2025 taxable maximum $176,100: https://www.ssa.gov/oact/cola/piaformula.html"
   - "IRS: 2025 limits: 401(k) employee deferral $23,500 (+$7,500 catch-up at 50+), IRA $7,000, HSA self-only $4,300: https://www.irs.gov/newsroom/401k-limit-increases-to-23500-for-2025-ira-limit-remains-7000"
   - "Damodaran, Historical Returns on Stocks, Bonds and Bills (1928-2024): S&P 500 ~9.9%, 10-year T-bonds ~4.5%, 3-month T-bills ~3.3% nominal averages: https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
   - "Hours: HEPI analysis of the Nature 2019 PhD survey: PhD students average 47 hrs/week: https://www.hepi.ac.uk/2020/06/25/new-report-shows-phd-students-work-50-more-than-undergraduates/"
@@ -63,6 +64,16 @@ accounts:
   access_age: 60
   retirement_tax_rate: 0.15  # after-tax view only. CHECK
 
+# Social Security from your own earnings record (SSA formula, 2025 figures,
+# today's dollars): 35 best years of Career pay, each capped at $176,100.
+# Ph.D. stipends are not Social Security wages. CHECK: the J&J years below
+# (count and average pay) and compare with your statement at ssa.gov/myaccount.
+social_security:
+  stream: Social Security
+  wage_streams: [Career pay]
+  prior_years: 4
+  prior_earnings: 30000
+
 income:
   - name: Ph.D. stipend
     amount: 40000          # take-home (already after tax)
@@ -72,8 +83,8 @@ income:
     start_year: 4
     taxable: true
   - name: Social Security
-    amount: 36000          # CHECK: estimate at ssa.gov/myaccount; ~$36k is a high earner at 67
-    start_year: 45         # age 67
+    amount: 36000          # placeholder: replaced by the benefit from your earnings (below)
+    start_year: 45         # age 67, full retirement age
 
 # Budget categories, in today's dollars per month. These are your Ph.D.-era
 # amounts; the lifestyle tiers below raise them as your income grows.

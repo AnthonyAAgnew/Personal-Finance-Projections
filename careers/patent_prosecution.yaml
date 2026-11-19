@@ -13,6 +13,7 @@ sources:
   - "LeanLaw citing AIPLA 2023 Economic Survey: median full-time IP attorney in private practice $270k; equity partners $420k: https://www.leanlaw.co/blog/compensation-models-for-intellectual-property-law-firms-why-your-pay-structure-might-be-your-biggest-competitive-liability/"
 
 assumptions:
+  - "Living costs during law school are borrowed too: ~$30k a year (less in 2L, when the summer associate job pays ~$40k), at the same 8% and 10-year term. ABA cost-of-attendance budgets include similar living allowances (CHECK)."
   - "Full-time JD in years 4-6 (ages 26-28) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
   - "First-year prosecution associate at ~$200k (below the $225k BigLaw scale; IP boutiques often pay less). CHECK"
@@ -36,6 +37,9 @@ events:
   - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 4}
   - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 5}
   - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 6}
+  - {name: Law living loan 1L, type: loan, amount: 30000, rate: 0.08, defer: 3, term: 10, year: 4}
+  - {name: Law living loan 2L, type: loan, amount: 20000, rate: 0.08, defer: 2, term: 10, year: 5}
+  - {name: Law living loan 3L, type: loan, amount: 30000, rate: 0.08, defer: 1, term: 10, year: 6}
   - {name: Senior associate / counsel, type: set_amount, target: Career pay, amount: 270000, year: 11, jitter: 1}
   - {name: Equity partner, type: set_amount, target: Career pay, amount: 420000, year: 15, jitter: 2, probability: 0.25, confidence: low}
 

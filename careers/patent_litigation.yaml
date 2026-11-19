@@ -14,6 +14,8 @@ sources:
   - "Bloomberg Law: the $225,000 starting salary: https://news.bloomberglaw.com/ip-law/the-225-000-starting-salary-how-big-law-associates-make-bank"
 
 assumptions:
+  - "Hiring odds (CHECK): a 60% chance of a BigLaw patent-litigation offer after the JD (a technical Ph.D. helps; the law school attended matters most). Otherwise patent prosecution at an IP firm (~$200k, ~$270k as senior associate or counsel), as in the prosecution path."
+  - "Living costs during law school are borrowed too: ~$30k a year (less in 2L, when the summer associate job pays ~$40k), at the same 8% and 10-year term. ABA cost-of-attendance budgets include similar living allowances (CHECK)."
   - "Full-time JD in years 4-6 (ages 26-28) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
   - "Associate pay follows the scale with bonuses: ~$245k (year 1), ~$318k (year 3), ~$385k (year 5), ~$550k (year 8)."
@@ -36,12 +38,19 @@ events:
   - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 4}
   - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 5}
   - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 6}
-  - {name: BigLaw hours, type: set_amount, target: Work hours, amount: 58, year: 7}
-  - {name: Third-year associate, type: set_amount, target: Career pay, amount: 317500, year: 9}
-  - {name: Fifth-year associate, type: set_amount, target: Career pay, amount: 385000, year: 11}
-  - {name: Eighth-year associate, type: set_amount, target: Career pay, amount: 550000, year: 14}
-  - {name: Makes partner, type: set_amount, target: Career pay, amount: 1200000, spread: 0.5, year: 15, jitter: 1, group: partnership, probability: 0.15, confidence: low}
-  - {name: Moves in-house, type: set_amount, target: Career pay, amount: 320000, year: 15, jitter: 1, group: partnership, probability: 0.85}
+  - {name: Law living loan 1L, type: loan, amount: 30000, rate: 0.08, defer: 3, term: 10, year: 4}
+  - {name: Law living loan 2L, type: loan, amount: 20000, rate: 0.08, defer: 2, term: 10, year: 5}
+  - {name: Law living loan 3L, type: loan, amount: 30000, rate: 0.08, defer: 1, term: 10, year: 6}
+  - {name: BigLaw offer, type: set_amount, target: Career pay, amount: 245000, year: 7, group: hire, probability: 0.6, confidence: medium}
+  - {name: IP firm instead, type: set_amount, target: Career pay, amount: 200000, year: 7, group: hire, probability: 0.4, confidence: medium}
+  - {name: BigLaw hours, type: set_amount, target: Work hours, amount: 58, same_time_as: BigLaw offer}
+  - {name: IP firm hours, type: set_amount, target: Work hours, amount: 50, same_time_as: IP firm instead}
+  - {name: Third-year associate, type: set_amount, target: Career pay, amount: 317500, same_time_as: BigLaw offer, offset: 2}
+  - {name: Fifth-year associate, type: set_amount, target: Career pay, amount: 385000, same_time_as: BigLaw offer, offset: 4}
+  - {name: Eighth-year associate, type: set_amount, target: Career pay, amount: 550000, same_time_as: BigLaw offer, offset: 7}
+  - {name: Makes partner, type: set_amount, target: Career pay, amount: 1200000, spread: 0.5, same_time_as: BigLaw offer, offset: 8, jitter: 1, group: partnership, probability: 0.15, confidence: low}
+  - {name: Moves in-house, type: set_amount, target: Career pay, amount: 320000, same_time_as: BigLaw offer, offset: 8, jitter: 1, group: partnership, probability: 0.85}
+  - {name: Senior associate / counsel (IP firm), type: set_amount, target: Career pay, amount: 270000, same_time_as: IP firm instead, offset: 4, jitter: 1, confidence: medium}
   - {name: Partner hours, type: set_amount, target: Work hours, amount: 55, same_time_as: Makes partner}
   - {name: In-house hours, type: set_amount, target: Work hours, amount: 45, same_time_as: Moves in-house}
 

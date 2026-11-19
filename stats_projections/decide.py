@@ -84,7 +84,10 @@ def criteria_values(res: Result, at_age: int = 65, fi_multiple: float = 25.0,
     }
     if res.portfolio is not None and res.spending is not None:
         w = res.portfolio[:, 1:]  # balance at the end of each year
-        fi = _first_year((w >= fi_multiple * res.spending) & (res.spending > 0))
+        # Judge FI on the budget your pay sets, not on extra spending the
+        # portfolio itself funds (which would make FI a moving target).
+        sp = res.core_spending if res.core_spending is not None else res.spending
+        fi = _first_year((w >= fi_multiple * sp) & (sp > 0))
         out["fi_age"] = _median_age(fi + 1, a0, end_age)
     else:
         out["fi_age"] = np.nan

@@ -52,6 +52,7 @@ class Result:
     # Account balances, each (paths, years + 1): taxable, traditional, roth,
     # hsa, plus "basis" (cost basis of the taxable account).
     accounts: dict[str, np.ndarray] | None = None
+    core_spending: np.ndarray | None = None  # (paths, years) budget from take-home alone
     home: np.ndarray | None = None  # (paths, years + 1) home value (in net worth only)
 
     @property
@@ -476,6 +477,7 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
     hours = np.empty((P, T))
     spend = {c: np.empty((P, T)) for c in cats}
     creep = np.zeros((P, T))
+    core_spend = np.zeros((P, T))  # spending a pay-only budget would set (no portfolio draw)
     tier = np.zeros((P, T), dtype=np.int8)
     afford = np.zeros((P, T)) if cats else None
     inc_means = {n: np.zeros(T) for n in F.income}
@@ -486,8 +488,32 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
     fire_year = np.full(P, -1)
     peak_spend = np.zeros(P)  # strategies plan around the most you have spent so far
 
+    ssc = s.social_security
+    income_arrays = dict(F.income)
+    if ssc is not None and ssc.stream in income_arrays:
+        ss_stream = next(x for x in s.income if x.name == ssc.stream)
+        ss_year = min(ss_stream.start_year, T)
+        earnings = np.zeros((P, T))
+        ss_benefit = np.zeros(P)
+    else:
+        ssc = None
+
     for t in range(T):
         w = W[:, t] + C[:, t]  # liquid assets
+        if ssc is not None and t == ss_year:
+            # Benefit from the earnings record so far: 35 best years, capped.
+            hist = earnings[:, :t]
+            if ssc.prior_years:
+                hist = np.hstack([hist, np.full((P, ssc.prior_years), min(ssc.prior_earnings, ssc.cap))])
+            best = -np.sort(-hist, axis=1)[:, :35]
+            aime = best.sum(axis=1) / 35 / 12
+            pia = (0.9 * np.minimum(aime, ssc.bend1)
+                   + 0.32 * np.clip(aime - ssc.bend1, 0, ssc.bend2 - ssc.bend1)
+                   + 0.15 * np.maximum(aime - ssc.bend2, 0))
+            ss_benefit = 12 * pia * ssc.claim_factor
+            arr = income_arrays[ssc.stream].copy()
+            arr[:, t:] = np.where(arr[:, t:] > 0, ss_benefit[:, None], 0.0)
+            income_arrays[ssc.stream] = arr
         # Income this year, with the strategy applied to the "stop" streams.
         inc_t = np.zeros(P)
         taxable_t = np.zeros(P)
@@ -495,8 +521,11 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
         per_stream_taxable = []
         match_t = np.zeros(P)
         wage_t = np.zeros(P)
-        for name, a in F.income.items():
+        earn_t = np.zeros(P)
+        for name, a in income_arrays.items():
             v = a[:, t] * factor if name in stop else a[:, t]
+            if ssc is not None and name in ssc.wage_streams:
+                earn_t += v
             inc_means[name][t] = v.mean()
             inc_t += v
             if F.taxable[name]:
@@ -508,6 +537,8 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
                 match_t += v
             if acct is not None and name == acct.wage_stream:
                 wage_t = v
+        if ssc is not None:
+            earnings[:, t] = np.minimum(earn_t, ssc.cap)
         pretax_t = np.zeros(P)
         if acct is not None:
             working = wage_t > 0
@@ -558,6 +589,20 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
             creep[:, t] = np.where((k > 0) & any_on[:, t], ls.creep * np.maximum(above, 0.0), 0.0)
             c_t -= creep[:, t]
             spent += creep[:, t]
+            # The same budget judged on take-home alone: what you would need to
+            # keep living as you do now if work stopped (the FI yardstick).
+            k0 = np.searchsorted(thresholds, avg, side="right")
+            if ls.max_tier is not None:
+                k0 = np.minimum(k0, ls.max_tier)
+            core = fixed_spend[:, t].copy()
+            for c in cats:
+                amt0 = tier_amt[c][k0] * cost_index[t]
+                core += np.where(np.isnan(amt0) | F.off[c][:, t], F.expenses[c][:, t], amt0)
+            above0 = avg - np.where(k0 > 0, thresholds[np.maximum(k0 - 1, 0)], np.inf)
+            core += np.where((k0 > 0) & any_on[:, t], ls.creep * np.maximum(above0, 0.0), 0.0)
+            core_spend[:, t] = np.minimum(core, spent)
+        else:
+            core_spend[:, t] = spent
         if stop_saving:
             extra = np.where(coasting, np.maximum(c_t, 0.0), 0.0)
             coast_spend[:, t] = extra
@@ -704,6 +749,7 @@ def simulate(s: Scenario, F: "Flows | None" = None) -> Result:
                   strategy_year=fire_year if st else None,
                   cash=C if s.cash is not None else None,
                   accounts=A if acct is not None else None,
+                  core_spending=core_spend,
                   home=F.home if F.home.any() else None)
 
 

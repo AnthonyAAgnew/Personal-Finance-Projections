@@ -339,6 +339,28 @@ class Accounts:
 
 
 @dataclass(frozen=True)
+class SocialSecurity:
+    """Social Security worked out from your own earnings record.
+
+    From the year the ``stream`` starts (your claiming age), its amount is
+    replaced by the benefit from the SSA formula: average of your 35 highest
+    years of wages (``wage_streams``, each year capped at ``cap``), monthly,
+    then 90% up to ``bend1``, 32% up to ``bend2`` and 15% above. Years worked
+    before the plan starts count through ``prior_years`` at ``prior_earnings``.
+    All in today's dollars (the real system indexes earnings and bend points).
+    """
+
+    stream: str = "Social Security"
+    wage_streams: tuple[str, ...] = ("Career pay",)
+    cap: float = 176_100
+    bend1: float = 1_226
+    bend2: float = 7_391
+    prior_years: int = 0
+    prior_earnings: float = 0.0
+    claim_factor: float = 1.0  # 1.0 at full retirement age 67; ~0.7 at 62, ~1.24 at 70
+
+
+@dataclass(frozen=True)
 class Bonds:
     """Bond returns for the glide path (nominal), correlated with stocks."""
 
@@ -369,6 +391,7 @@ class Scenario:
     quality: Quality | None = None
     cash: Cash | None = None
     accounts: Accounts | None = None
+    social_security: SocialSecurity | None = None
     bonds: Bonds | None = None
     # ((year, stock share), ...), linearly interpolated; empty = all in returns.
     allocation: tuple[tuple[int, float], ...] = ()
@@ -587,6 +610,21 @@ def _accounts(data: Any, starting_balance: float) -> Accounts | None:
     return a
 
 
+def _social_security(data: Any) -> SocialSecurity | None:
+    if not data:
+        return None
+    _check_keys("social_security", data, set(SocialSecurity.__dataclass_fields__))
+    d = dict(data)
+    if "wage_streams" in d:
+        d["wage_streams"] = tuple(str(x) for x in d["wage_streams"])
+    for k in ("cap", "bend1", "bend2", "prior_earnings", "claim_factor"):
+        if k in d:
+            d[k] = float(d[k])
+    if "prior_years" in d:
+        d["prior_years"] = int(d["prior_years"])
+    return SocialSecurity(**d)
+
+
 def _cash(data: Any) -> Cash | None:
     if not data:
         return None
@@ -671,7 +709,7 @@ TOP_KEYS = {
     "name", "description", "horizon_years", "paths", "seed", "start_age",
     "failure_floor", "borrowing_rate", "portfolio", "income", "expenses", "events",
     "taxes", "sources", "assumptions", "lifestyle", "time", "strategy", "quality",
-    "accounts",
+    "accounts", "social_security",
 }
 
 
@@ -869,6 +907,7 @@ def from_dict(raw: dict) -> Scenario:
         quality=_quality(raw.get("quality")),
         cash=_cash(portfolio.get("cash")),
         accounts=_accounts(raw.get("accounts"), float(portfolio.get("starting_balance", 0.0))),
+        social_security=_social_security(raw.get("social_security")),
         bonds=bonds,
         allocation=allocation,
         stress=stress,

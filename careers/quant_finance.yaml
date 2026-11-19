@@ -12,6 +12,7 @@ sources:
   - "First-year total comp estimates ~$300k-$450k at top firms: https://www.tradermath.org/salaries/quant-compensation"
 
 assumptions:
+  - "Hiring odds (CHECK, low confidence): a 30% chance of an offer from a top trading firm (Jane Street, Citadel, Two Sigma tier), which take a small share of even strong Ph.D. applicants. Otherwise a quant role at a bank or smaller fund in New York at ~$200k, rising to ~$300k about 5 years in."
   - "Assumes you land the offer (top firms are very selective)."
   - "First-year total ~$350k; senior quant researcher around age 32 (~$600k); 20% become a portfolio manager or top performer (~$1.5M median, very wide spread) around age 36. CHECK"
   - "Bonuses swing pay +-30% a year; 8% yearly chance of being cut (half a year's pay lost)."
@@ -31,8 +32,11 @@ lifestyle:
 
 events:
   - {name: New York rent, type: scale, target: Housing, factor: 1.6, year: 4}
-  - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, year: 8, jitter: 1, confidence: medium}
-  - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, year: 12, jitter: 2, probability: 0.2, confidence: low}
+  - {name: Top-firm offer, type: set_amount, target: Career pay, amount: 350000, year: 4, group: hire, probability: 0.3, confidence: medium}
+  - {name: Bank or smaller fund instead, type: set_amount, target: Career pay, amount: 200000, year: 4, group: hire, probability: 0.7, confidence: medium}
+  - {name: Senior quant researcher, type: set_amount, target: Career pay, amount: 600000, same_time_as: Top-firm offer, offset: 4, jitter: 1, confidence: medium}
+  - {name: Portfolio manager / top performer, type: set_amount, target: Career pay, amount: 1500000, spread: 0.6, same_time_as: Top-firm offer, offset: 8, jitter: 2, probability: 0.2, confidence: low}
+  - {name: Senior quant (bank or fund), type: set_amount, target: Career pay, amount: 300000, same_time_as: Bank or smaller fund instead, offset: 5, jitter: 1, confidence: medium}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 71, satisfaction: 0.65, burnout: 0.55}
