@@ -78,6 +78,17 @@ python -m streamlit run app.py
   payment, mortgage, owner costs and appreciation; the home counts in net worth.
 - **Coast FIRE (stop saving)** is the standard definition; "Coast, half pay and
   hours" is the semi-retirement variant.
+- **Tax accounts** (`accounts:` in the profile): while you have a paycheck,
+  savings fill a 401(k) (pre-tax, with the employer match), an HSA and a Roth
+  IRA at IRS 2025 limits, then a taxable account. Withdrawals come from taxable
+  (capital gains tax), then the 401(k) (income tax, 10% penalty before 60),
+  then Roth and HSA. The Results tab shows each account and an after-tax net
+  worth at the chosen age. Not modeled: required minimum distributions, Roth
+  conversions, Social Security taxation.
+- **Decision points** (Decide tab): start on path A and, at a chosen age,
+  switch to path B on the simulated lives that meet a rule (liquid savings or
+  net worth above a threshold). Shows the share that switch and how the mixed
+  plan compares with always A or always B (`stats_projections/decisions.py`).
 - **Break-even finder** (Sensitivity tab): solves for the value of one input of
   option A (EP pay, exit price, tuition) that makes it match option B.
 - **Free time** (Hours tab): waking hours left after work and commuting.

@@ -79,6 +79,8 @@ def to_dict(s: Scenario) -> dict:
         out["portfolio"]["cash"] = c
     if s.bonds is not None:
         out["portfolio"]["bonds"] = asdict(s.bonds)
+    if s.accounts is not None:
+        out["accounts"] = asdict(s.accounts)
     if s.allocation:
         out["portfolio"]["allocation"] = [list(x) for x in s.allocation]
     if s.stress:

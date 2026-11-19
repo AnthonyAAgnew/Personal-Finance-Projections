@@ -307,6 +307,38 @@ class Cash:
 
 
 @dataclass(frozen=True)
+class Accounts:
+    """Tax-advantaged accounts (all amounts in today's dollars, per year).
+
+    While ``wage_stream`` pays you, you defer ``k401`` (capped at half the
+    wage) into a 401(k), ``roth_401k_share`` of it as Roth, and put ``hsa``
+    into an HSA; both pre-tax parts lower income tax (payroll taxes still
+    apply). Employer matches go into the traditional 401(k). Other savings go
+    to a Roth IRA (up to ``ira``, backdoor if needed), then a taxable account.
+
+    Withdrawals: taxable first (``gains_rate`` on the gain share), then the
+    traditional 401(k) (income tax, plus ``early_penalty`` before
+    ``access_age``), then Roth, then HSA. Starting balances in ``traditional``,
+    ``roth`` and ``hsa_balance`` come out of the portfolio's starting balance;
+    the rest is taxable, with no unrealized gains yet.
+    """
+
+    k401: float = 23_500
+    roth_401k_share: float = 0.0
+    ira: float = 7_000
+    hsa: float = 4_300
+    traditional: float = 0.0
+    roth: float = 0.0
+    hsa_balance: float = 0.0
+    gains_rate: float = 0.24
+    taxable_drag: float = 0.004
+    early_penalty: float = 0.10
+    access_age: int = 60
+    wage_stream: str = "Career pay"
+    retirement_tax_rate: float = 0.15  # after-tax view only: average tax on 401(k) withdrawals
+
+
+@dataclass(frozen=True)
 class Bonds:
     """Bond returns for the glide path (nominal), correlated with stocks."""
 
@@ -336,6 +368,7 @@ class Scenario:
     strategy: Strategy | None = None
     quality: Quality | None = None
     cash: Cash | None = None
+    accounts: Accounts | None = None
     bonds: Bonds | None = None
     # ((year, stock share), ...), linearly interpolated; empty = all in returns.
     allocation: tuple[tuple[int, float], ...] = ()
@@ -540,6 +573,20 @@ def _equity(where: str, data: Any) -> Equity | None:
     return eq
 
 
+def _accounts(data: Any, starting_balance: float) -> Accounts | None:
+    if not data:
+        return None
+    _check_keys("accounts", data, set(Accounts.__dataclass_fields__))
+    d = {k: (str(v) if k == "wage_stream" else int(v) if k == "access_age" else float(v))
+         for k, v in data.items()}
+    a = Accounts(**d)
+    if a.traditional + a.roth + a.hsa_balance > starting_balance + 1e-6:
+        raise ScenarioError("accounts: traditional + roth + hsa_balance exceed the starting balance")
+    if not 0 <= a.roth_401k_share <= 1 or min(a.k401, a.ira, a.hsa) < 0:
+        raise ScenarioError("accounts: contributions >= 0 and roth_401k_share in [0, 1]")
+    return a
+
+
 def _cash(data: Any) -> Cash | None:
     if not data:
         return None
@@ -624,6 +671,7 @@ TOP_KEYS = {
     "name", "description", "horizon_years", "paths", "seed", "start_age",
     "failure_floor", "borrowing_rate", "portfolio", "income", "expenses", "events",
     "taxes", "sources", "assumptions", "lifestyle", "time", "strategy", "quality",
+    "accounts",
 }
 
 
@@ -820,6 +868,7 @@ def from_dict(raw: dict) -> Scenario:
         strategy=_strategy(raw.get("strategy")),
         quality=_quality(raw.get("quality")),
         cash=_cash(portfolio.get("cash")),
+        accounts=_accounts(raw.get("accounts"), float(portfolio.get("starting_balance", 0.0))),
         bonds=bonds,
         allocation=allocation,
         stress=stress,

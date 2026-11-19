@@ -558,3 +558,30 @@ def free_time(res: Result, commute: float = COMMUTE_HOURS_PER_WEEK,
         retired_years=float(np.median((~working & (ages >= a0 + 4)).sum(axis=1))),
         free_share=float(np.median(free.sum(axis=1)) / (AWAKE_HOURS_PER_WEEK * 52 * s.horizon_years)),
     )
+
+
+def accounts_at(res: Result, age: int = 65) -> dict | None:
+    """Median account balances at an age, and net worth after the taxes still owed.
+
+    After-tax net worth = cash + taxable minus tax on its unrealized gains
+    + traditional 401(k) x (1 - retirement_tax_rate) + Roth + HSA + home - loans.
+    """
+    s = res.scenario
+    if res.accounts is None or s.accounts is None:
+        return None
+    a0 = s.start_age or 0
+    col = int(np.clip(age - a0, 0, s.horizon_years))
+    A = res.accounts
+    acct = s.accounts
+    cash = res.cash[:, col] if res.cash is not None else 0.0
+    home = res.home[:, col] if res.home is not None else 0.0
+    debt = res.debt[:, col] if res.debt is not None else 0.0
+    tx = A["taxable"][:, col]
+    after = (cash + tx - acct.gains_rate * np.maximum(tx - A["basis"][:, col], 0.0)
+             + A["traditional"][:, col] * (1 - acct.retirement_tax_rate)
+             + A["roth"][:, col] + A["hsa"][:, col] + home - debt)
+    out = {k: float(np.median(A[k][:, col])) for k in ("taxable", "traditional", "roth", "hsa")}
+    out["cash"] = float(np.median(cash))
+    out["after_tax"] = float(np.median(after))
+    out["pre_tax"] = float(np.median(res.net_worth[:, col]))
+    return out

@@ -20,6 +20,7 @@ borrowing_rate: 0.06       # real rate on any unplanned debt (credit, etc.)
 include: ../data/taxes_ca_single.yaml
 
 sources:
+  - "IRS: 2025 limits: 401(k) employee deferral $23,500 (+$7,500 catch-up at 50+), IRA $7,000, HSA self-only $4,300: https://www.irs.gov/newsroom/401k-limit-increases-to-23500-for-2025-ira-limit-remains-7000"
   - "Damodaran, Historical Returns on Stocks, Bonds and Bills (1928-2024): S&P 500 ~9.9%, 10-year T-bonds ~4.5%, 3-month T-bills ~3.3% nominal averages: https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
   - "Hours: HEPI analysis of the Nature 2019 PhD survey: PhD students average 47 hrs/week: https://www.hepi.ac.uk/2020/06/25/new-report-shows-phd-students-work-50-more-than-undergraduates/"
   - "Hours: BLS 2024: 11.1% of workers 25-54, 14.2% of 55-64 and 38.3% of 65+ work part time: https://www.bls.gov/opub/ted/2025/38-3-percent-of-employed-older-americans-worked-part-time-in-2024.htm"
@@ -45,6 +46,22 @@ portfolio:
   inflation:
     mean: 0.025
     stdev: 0.012
+
+# Tax-advantaged accounts. Contribution limits are the IRS 2025 figures, held
+# flat in today's dollars (limits are indexed to inflation). The $40k invested
+# is assumed to be all taxable brokerage. CHECK: move any 401(k) or Roth money
+# you already have into traditional / roth below.
+accounts:
+  k401: 23500              # employee 401(k) deferral while employed (2025 limit)
+  roth_401k_share: 0.0     # share of the deferral made as Roth 401(k)
+  ira: 7000                # Roth IRA (backdoor once income is too high)
+  hsa: 4300                # self-only HSA limit; needs a high-deductible plan. CHECK
+  traditional: 0
+  roth: 0
+  gains_rate: 0.24         # ~15% federal + ~9% California on long-term gains
+  early_penalty: 0.10      # 401(k) withdrawals before ~59.5
+  access_age: 60
+  retirement_tax_rate: 0.15  # after-tax view only. CHECK
 
 income:
   - name: Ph.D. stipend
