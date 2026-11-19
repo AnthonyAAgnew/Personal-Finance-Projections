@@ -153,6 +153,35 @@ python -m streamlit run app.py
   python -m stats_projections --profile profiles/my_profile.yaml "careers/*.yaml" --add life/partner.yaml --add strategies/coast_fire.yaml
   ```
 
+## Saved plans and history
+
+The **Saved plans** panel at the top saves the current setup (what to compare,
+simulation settings and any What if edits) under a name, and reloads it on any
+device. Each save also records a dated **snapshot** of the results. The
+**Overview > History** tab charts how each option's median at 65 has moved
+across snapshots, and logs **check-ins** of your actual net worth. Each
+check-in is compared, after inflation, with the projection from the latest
+snapshot saved on or before its date, and shows your percentile among the
+simulated lives.
+
+- **On your own computer**, everything goes to `saved/` (git-ignored).
+- **On the hosted app**, everything goes to one secret GitHub gist. To set it up:
+  1. Create a secret gist at gist.github.com with any placeholder file, and
+     copy its id (the last part of its URL).
+  2. Create a GitHub token that can only read and write gists (fine-grained
+     token, account permission *Gists: Read and write*).
+  3. In the Streamlit Cloud app settings, open **Secrets** and add:
+
+     ```toml
+     [storage]
+     github_token = "github_pat_..."
+     gist_id = "abc123..."
+     password = "something only you know"
+     ```
+
+  The password locks the saved plans and history (the rest of the app stays
+  open). A secret gist is unlisted, not encrypted, so keep its URL private.
+
 ## Careers
 
 ```powershell
@@ -298,6 +327,7 @@ print(summarize(base).p_fail, compare(base, home).delta)
 | `stats_projections/report.py` | Summaries, paired comparison, CSV, charts |
 | `stats_projections/sensitivity.py` | One-at-a-time sensitivity and tornado chart |
 | `stats_projections/edit.py` | Scenario to file data, and minimal override diffs |
+| `stats_projections/storage.py` | Saved plans, snapshots and check-ins (local folder or gist) |
 | `app.py` | Streamlit front end |
 | `profiles/`, `careers/`, `data/` | You, career paths, tax table |
 | `stats_projections/cli.py` | Command line |

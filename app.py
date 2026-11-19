@@ -14,7 +14,9 @@ reference and can save the edits as a small override file that ``extends`` it.
 
 from __future__ import annotations
 
+import hmac
 import sys
+from datetime import date
 from dataclasses import replace
 from pathlib import Path
 
@@ -46,14 +48,16 @@ def _fresh_engine() -> None:
 _fresh_engine()
 
 from stats_projections import ScenarioError, compare, load_scenario, simulate, summarize
-from stats_projections.config import career_info, compose, from_dict
+from stats_projections.config import _merge, career_info, compose, from_dict
 from stats_projections.edit import diff, to_dict
 from stats_projections.report import (
     COLORS, INCOME_MILESTONES, NET_WORTH_MILESTONES, WEEKS_PER_YEAR, _slug, career_metrics,
     debt_metrics, hours_metrics, income_milestones, net_worth_milestones, strategy_metrics,
     tier_shares)
 from stats_projections.decisions import RULES as DP_RULES, decide as dp_decide
-from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, pareto, score
+from stats_projections.decide import CRITERIA, DEFAULT_WEIGHTS, criteria_values, pareto, score
+from stats_projections.storage import (GistStore, LocalStore, StorageError, percentile_of,
+                                       to_todays_dollars, years_between)
 from stats_projections.sensitivity import Steps, analyze, knobs
 from stats_projections.breakeven import METRICS as BE_METRICS, levers as be_levers, solve as be_solve
 from stats_projections.stress import DESCRIPTIONS as STRESS_HELP, presets as stress_presets
@@ -85,6 +89,8 @@ st.markdown("""<style>
   [data-testid="stTabs"] button[role="tab"] {padding: 0.2rem 0.35rem; white-space: nowrap;}
   [data-testid="stTabs"] button[role="tab"] p {font-size: 0.92rem;}
   [data-testid="stExpander"] summary p {font-size: 1rem;}
+  /* 16px stops iPhone Safari from zooming in when a field is tapped. */
+  input, textarea, select {font-size: 16px !important;}
 }
 </style>""", unsafe_allow_html=True)
 
@@ -175,15 +181,64 @@ def money(x: float) -> str:
 
 CORE_CAREERS = ("rd_engineer", "regulator", "device_sales", "doctor", "cardiology_ep", "entrepreneur")
 
+def on_local_host() -> bool:
+    host = (st.context.headers.get("Host") or "").split(":")[0]
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
+# A loaded plan supplies the widget defaults. Each load bumps the nonce, so
+# every setup widget is created fresh and picks up the plan's values.
+PLAN = st.session_state.get("active_plan") or {}
+NONCE = st.session_state.get("plan_nonce", 0)
+
+
+def wk(name: str) -> str:
+    return f"{name}__{NONCE}"
+
+
+def pv(key: str, default=None):
+    return PLAN.get(key, default)
+
+
+def _idx(options, match, default: int = 0) -> int:
+    return next((i for i, o in enumerate(options) if match(o)), default)
+
+
+def _stem(f) -> str | None:
+    return getattr(f, "stem", None)
+
+
+def get_store():
+    """(store, password, note). Gist when secrets are set, else a local folder on your own computer."""
+    try:
+        sec = dict(st.secrets.get("storage", {}))
+    except Exception:  # no secrets file at all
+        sec = {}
+    if sec.get("github_token") and sec.get("gist_id"):
+        k = ("gist", sec["gist_id"])
+        if st.session_state.get("_store_key") != k:
+            st.session_state["_store"] = GistStore(sec["github_token"], sec["gist_id"])
+            st.session_state["_store_key"] = k
+        return st.session_state["_store"], sec.get("password"), ""
+    if on_local_host():
+        return LocalStore(ROOT / "saved"), sec.get("password"), ""
+    return None, None, ("Saving isn't set up on the hosted app yet. It needs a private GitHub "
+                        "gist and a token in the app's secrets (see Saved plans in the README).")
+
+
 st.title("STATS Projections")
 summary_slot = st.empty()
 setup = st.expander("⚙️ Setup: what to compare", expanded=False)
 sim = st.expander("🎲 Simulation settings", expanded=False)
+saved_exp = st.expander("💾 Saved plans" + (f": {PLAN['name']}" if PLAN.get("name") else ""),
+                        expanded=False)
 with setup:
     setup_left, setup_right = st.columns(2)
 
 with setup_left:
-    mode = st.radio("Compare", ["Careers", "Strategies", "Life scenarios"], horizontal=True,
+    MODES = ["Careers", "Strategies", "Life scenarios"]
+    mode = st.radio("Compare", MODES, horizontal=True, key=wk("mode"),
+                    index=_idx(MODES, lambda m: m == pv("mode")),
                     help="Careers: your profile under each career path. Strategies: one career "
                          "under each finance strategy (FIRE, coast...). Life scenarios: the "
                          "standalone files in scenarios/.")
@@ -194,17 +249,22 @@ with setup_left:
         if not profiles:
             st.error(f"No profile files in {PROFILE_DIR}")
             st.stop()
-        profile_file = st.selectbox("Profile", profiles, format_func=lambda p: p.stem)
+        profile_file = st.selectbox("Profile", profiles, format_func=lambda p: p.stem, key=wk("profile"),
+                                    index=_idx(profiles, lambda f: f.stem == pv("profile")))
         if mode == "Strategies":
             careers = sorted(CAREER_DIR.glob("*.yaml"))
             career_file = st.selectbox(
-                "Career", careers, format_func=file_name,
-                index=next((i for i, c in enumerate(careers) if c.stem == "rd_engineer"), 0))
-        life_files = st.multiselect("Life events", sorted(LIFE_DIR.glob("*.yaml")),
+                "Career", careers, format_func=file_name, key=wk("career"),
+                index=_idx(careers, lambda c: c.stem == pv("career", "rd_engineer")))
+        life_options = sorted(LIFE_DIR.glob("*.yaml"))
+        life_files = st.multiselect("Life events", life_options, key=wk("life"),
+                                    default=[f for f in life_options if f.stem in pv("life", [])],
                                     format_func=file_name,
                                     help="Layered on every option: partner, kids, moving abroad.")
+        loc_options = [None, *sorted(LOCATION_DIR.glob("*.yaml"))]
         location_file = st.selectbox(
-            "Location after the Ph.D.", [None, *sorted(LOCATION_DIR.glob("*.yaml"))],
+            "Location after the Ph.D.", loc_options, key=wk("location"),
+            index=_idx(loc_options, lambda f: _stem(f) == pv("location")),
             format_func=lambda f: "Irvine (profile)" if f is None else file_name(f),
             help="Pay, living costs and state taxes relative to Irvine, from the start of "
                  "your career. Applied after life events, so a partner's joint return keeps "
@@ -217,8 +277,8 @@ with setup_left:
         if mode == "Careers":
             strategies = sorted(STRATEGY_DIR.glob("*.yaml"))
             strategy_file = st.selectbox(
-                "Finance strategy", strategies, format_func=file_name,
-                index=next((i for i, g in enumerate(strategies) if g.stem == "work_to_65"), 0))
+                "Finance strategy", strategies, format_func=file_name, key=wk("strategy"),
+                index=_idx(strategies, lambda g: g.stem == pv("strategy", "work_to_65")))
 
 scenarios = load_all(mode, profile_file, tuple(life_files), strategy_file, career_file)
 if not scenarios:
@@ -231,14 +291,17 @@ default_base = next((n for n, (f, _) in scenarios.items() if f.stem == ref_key),
 
 with setup_right:
     label = {"Careers": "Reference career", "Strategies": "Reference strategy"}.get(mode, "Baseline")
-    base_name = st.selectbox(label, names, index=names.index(default_base))
+    base_name = st.selectbox(label, names, key=wk("base"),
+                             index=names.index(pv("base") if pv("base") in names else default_base))
     others = [n for n in names if n != base_name]
     if mode == "Careers":
         default_others = [n for n in others if scenarios[n][0].stem in CORE_CAREERS]
         st.caption(f"{len(names)} careers available; the six core paths are preselected.")
     else:
         default_others = others
-    chosen = st.multiselect("Compare with", others, default=default_others)
+    if "chosen" in PLAN:
+        default_others = [n for n in PLAN["chosen"] if n in others]
+    chosen = st.multiselect("Compare with", others, default=default_others, key=wk("chosen"))
 
     base_file, base = scenarios[base_name]
     save_dir = {"Careers": CAREER_DIR, "Life scenarios": SCENARIO_DIR}.get(mode)
@@ -246,9 +309,12 @@ with setup_right:
 
 with sim:
     st.caption("Applied to every option, so comparisons stay fair.")
-    paths = st.select_slider("Paths", [1000, 2000, 5000, 10000, 20000, 50000], value=base.paths)
-    seed = st.number_input("Random seed", value=base.seed, step=1)
-    floor = st.number_input("Failure floor ($)", value=float(base.failure_floor), step=5000.0)
+    PATH_OPTIONS = [1000, 2000, 5000, 10000, 20000, 50000]
+    paths = st.select_slider("Paths", PATH_OPTIONS, key=wk("paths"),
+                             value=pv("paths") if pv("paths") in PATH_OPTIONS else base.paths)
+    seed = st.number_input("Random seed", value=int(pv("seed", base.seed)), step=1, key=wk("seed"))
+    floor = st.number_input("Failure floor ($)", value=float(pv("floor", base.failure_floor)),
+                            step=5000.0, key=wk("floor"))
 
     r = base.returns
     if r.model == "bootstrap":
@@ -256,32 +322,38 @@ with sim:
         returns = r
     else:
         model = st.radio("Return model", ["normal", "student_t"],
-                         index=0 if r.model == "normal" else 1, horizontal=True,
+                         index=0 if pv("model", r.model) == "normal" else 1, horizontal=True,
+                         key=wk("model"),
                          help="student_t keeps the mean and volatility but adds fatter tails (more crashes).")
         mean = st.slider("Stock return (nominal)" if base.allocation else "Portfolio return (nominal)",
-                         0.0, 12.0, round(r.mean * 100, 2), 0.25, format="%.2f%%",
+                         0.0, 12.0, float(pv("mean", round(r.mean * 100, 2))), 0.25,
+                         format="%.2f%%", key=wk("mean"),
                          help="With a glide path (profile allocation), this is the stock part; "
                               "bonds and cash have their own returns in the profile.")
-        stdev = st.slider("Return volatility", 0.0, 30.0, round(r.stdev * 100, 1), 0.5,
-                          format="%.1f%%")
+        stdev = st.slider("Return volatility", 0.0, 30.0, float(pv("stdev", round(r.stdev * 100, 1))),
+                          0.5, format="%.1f%%", key=wk("stdev"))
         dof = r.dof
         if model == "student_t":
-            dof = st.slider("Tail heaviness (degrees of freedom)", 3.0, 30.0, float(r.dof), 0.5,
+            dof = st.slider("Tail heaviness (degrees of freedom)", 3.0, 30.0,
+                            float(pv("dof", r.dof)), 0.5, key=wk("dof"),
                             help="Lower = fatter tails.")
         returns = replace(r, model=model, mean=round(mean / 100, 6),
                           stdev=round(stdev / 100, 6), dof=dof)
 
     i = base.inflation
-    infl_mean = st.slider("Inflation", 0.0, 8.0, round(i.mean * 100, 1), 0.1, format="%.1f%%")
-    infl_sd = st.slider("Inflation volatility", 0.0, 5.0, round(i.stdev * 100, 1), 0.1,
-                        format="%.1f%%")
+    infl_mean = st.slider("Inflation", 0.0, 8.0, float(pv("inflation", round(i.mean * 100, 1))), 0.1,
+                          format="%.1f%%", key=wk("inflation"))
+    infl_sd = st.slider("Inflation volatility", 0.0, 5.0,
+                        float(pv("inflation_sd", round(i.stdev * 100, 1))), 0.1,
+                        format="%.1f%%", key=wk("inflation_sd"))
     inflation = replace(i, mean=round(infl_mean / 100, 6), stdev=round(infl_sd / 100, 6))
 
     retire_ev = next((e for e in base.events if e.name == "Retire"), None)
     retire_year = retire_ev.year if retire_ev else max(base.horizon_years - 30, 1)
     career_start = next((x.start_year for x in base.income if x.name == "Career pay"), 0)
     stress_options = stress_presets(career_start, retire_year)
-    stress_name = st.selectbox("Market scenario", list(stress_options),
+    stress_name = st.selectbox("Market scenario", list(stress_options), key=wk("stress"),
+                               index=_idx(list(stress_options), lambda n: n == pv("stress")),
                                help="Stress tests lay a bad stretch of years over every random "
                                     "path, so options are still compared on the same markets.")
     st.caption(STRESS_HELP[stress_name])
@@ -304,6 +376,76 @@ summary_bits += [f"{int(paths):,} paths", stress_name]
 summary_slot.caption(f"{mode}: " + " · ".join(summary_bits))
 
 
+current_plan = {
+    "mode": mode, "profile": _stem(profile_file), "career": _stem(career_file),
+    "life": [f.stem for f in life_files if f != location_file], "location": _stem(location_file),
+    "strategy": _stem(strategy_file), "base": base_name, "chosen": list(chosen),
+    "paths": int(paths), "seed": int(seed), "floor": float(floor), "model": returns.model,
+    "mean": round(returns.mean * 100, 2), "stdev": round(returns.stdev * 100, 1),
+    "dof": float(returns.dof), "inflation": float(infl_mean), "inflation_sd": float(infl_sd),
+    "stress": stress_name,
+}
+
+store, store_password, store_note = get_store()
+store_open = store is not None and (not store_password or st.session_state.get("store_ok"))
+save_request = None
+with saved_exp:
+    if store is None:
+        st.info(store_note)
+    elif not store_open:
+        st.caption("Your saved plans and check-ins are behind a password.")
+        pw_in = st.text_input("Password", type="password", key="store_pw_in")
+        if st.button("Unlock"):
+            if hmac.compare_digest(pw_in.encode(), str(store_password).encode()):
+                st.session_state["store_ok"] = True
+                st.rerun()
+            else:
+                st.error("Wrong password.")
+    else:
+        try:
+            saved_plans = store.plans()
+        except StorageError as exc:
+            st.error(f"Couldn't read saved plans: {exc}")
+            saved_plans = {}
+        st.caption(f"Saved in {store.label}. Saving also records a dated snapshot of the results "
+                   "(Overview > History), so you can track how the outlook changes.")
+        if saved_plans:
+            plan_names = list(saved_plans)
+            pick = st.selectbox("Saved plan", plan_names,
+                                format_func=lambda n: f"{n} (saved {saved_plans[n].get('saved', '?')})",
+                                index=_idx(plan_names, lambda n: n == PLAN.get("name")))
+            pc1, pc2 = st.columns(2)
+            if pc1.button("Load plan", type="primary"):
+                st.session_state["active_plan"] = saved_plans[pick]
+                st.session_state["plan_nonce"] = NONCE + 1
+                st.rerun()
+            with pc2.popover("Delete plan"):
+                st.write(f"Delete **{pick}**? Its snapshots stay in History.")
+                if st.button("Delete", key="confirm_delete_plan"):
+                    try:
+                        store.delete_plan(pick)
+                    except StorageError as exc:
+                        st.error(f"Couldn't delete: {exc}")
+                    else:
+                        if PLAN.get("name") == pick:
+                            st.session_state.pop("active_plan", None)
+                        st.rerun()
+        else:
+            st.caption("No saved plans yet.")
+        plan_name = st.text_input("Save the current setup as", value=PLAN.get("name", ""),
+                                  placeholder="e.g. Industry vs EP, Texas")
+        plan_note = st.text_input("Note (optional)", value=PLAN.get("note", ""),
+                                  placeholder="What changed, what you're deciding")
+        if st.button("Save plan and snapshot", disabled=not plan_name.strip()):
+            save_request = (plan_name.strip(), plan_note.strip())
+        save_slot = st.empty()
+        if flash := st.session_state.pop("_flash", None):
+            save_slot.success(flash)
+        if PLAN.get("what_if") and PLAN.get("base") != base_name:
+            st.caption(f"The loaded plan's What if edits apply to {PLAN['base']}, so they're "
+                       "left out while another reference is selected.")
+
+
 def shared(s):
     return replace(s, paths=int(paths), seed=int(seed), failure_floor=float(floor),
                    returns=returns, inflation=inflation, stress=stress or s.stress)
@@ -313,13 +455,13 @@ def shared(s):
 # What-if editor (built before the results so they can include it)
 # ----------------------------------------------------------------------------
 
-tab_names = ["Results", "Milestones", "Lifestyle", "Hours", "Cash flow", "What if",
+tab_names = ["Results", "Milestones", "History", "Lifestyle", "Hours", "Cash flow", "What if",
              "Sensitivity", "Files"]
 if profile_file:
     tab_names.insert(5, "Assumptions")
     tab_names.insert(1, "Decide")
 TAB_GROUPS = {
-    "Overview": ["Results", "Milestones"],
+    "Overview": ["Results", "Milestones", "History"],
     "Compare": ["Decide", "Sensitivity"],
     "Plan": ["What if", "Lifestyle", "Hours", "Cash flow"],
     "Details": ["Assumptions", "Files"],
@@ -573,8 +715,7 @@ with tab_edit:
         fname = f"{_slug(new_name)}.yaml"
         cdl, csave = st.columns(2)
         cdl.download_button("Download YAML", text, file_name=fname, mime="text/yaml")
-        host = (st.context.headers.get("Host") or "").split(":")[0]
-        if host not in ("localhost", "127.0.0.1", "::1"):
+        if not on_local_host():
             csave.caption("Saving to the app's folders only works when you run the app on your "
                           "own computer. On the hosted app, download the file and add it to the "
                           "repo (shared server files would be visible to everyone and lost on "
@@ -598,7 +739,55 @@ with tab_edit:
 active = [shared(base)] + [shared(scenarios[n][1]) for n in chosen]
 if what_if is not None:
     active.append(shared(what_if))
+saved_what_if = None
+if PLAN.get("what_if") and PLAN.get("base") == base_name:
+    try:
+        saved_what_if = from_dict(_merge(to_dict(base), {**PLAN["what_if"],
+                                                         "name": f"Saved what if ({PLAN['name']})"}))
+        active.append(shared(saved_what_if))
+    except (ScenarioError, ValueError, TypeError, KeyError) as exc:
+        st.warning(f"The saved What if edits no longer fit {base_name}: {exc}")
 results = [run(s) for s in active]
+
+
+def _f(x):
+    x = float(x)
+    return None if np.isnan(x) else x
+
+
+def make_snapshot(plan_name: str, note: str) -> dict:
+    rows = []
+    for res in results:
+        s = res.scenario
+        col = int(np.clip(65 - (s.start_age or 0), 0, s.horizon_years))
+        nw = res.net_worth[:, col]
+        rows.append({"name": s.name, "median_65": _f(np.median(nw)),
+                     "p10_65": _f(np.percentile(nw, 10)), "p90_65": _f(np.percentile(nw, 90)),
+                     "p_fail": _f(res.p_fail), "fi_age": _f(criteria_values(res)["fi_age"])})
+    ref = results[0]
+    yrs = min(16, ref.net_worth.shape[1])
+    band = {f"p{q}": [round(float(v), 2) for v in np.percentile(ref.net_worth[:, :yrs], q, axis=0)]
+            for q in (10, 25, 50, 75, 90)}
+    return {"date": date.today().isoformat(), "plan": plan_name, "note": note,
+            "reference": ref.scenario.name, "start_age": ref.scenario.start_age,
+            "inflation": float(ref.scenario.inflation.mean), "paths": int(paths),
+            "options": rows, "band": band}
+
+
+if save_request is not None:
+    pname, pnote = save_request
+    new_plan = {**current_plan, "name": pname, "note": pnote, "saved": date.today().isoformat()}
+    if what_if is not None:
+        new_plan["what_if"] = diff(base, replace(what_if, name=base.name))
+    elif PLAN.get("what_if") and PLAN.get("base") == base_name:
+        new_plan["what_if"] = PLAN["what_if"]
+    try:
+        store.save_plan(new_plan, make_snapshot(pname, pnote))
+        st.session_state["active_plan"] = new_plan
+        st.session_state["_flash"] = f"Saved **{pname}** and a snapshot of today's results."
+        st.rerun()
+    except StorageError as exc:
+        save_slot.error(f"Couldn't save: {exc}")
 _domain = [r.scenario.name for r in results]
 color_scale = (alt.Scale(domain=_domain, range=list(COLORS[: len(results)]))
                if len(results) <= len(COLORS) else alt.Scale(domain=_domain, scheme="tableau20"))
@@ -1576,3 +1765,134 @@ with tab_files:
         f, _ = scenarios[n]
         with st.expander(f"{n}  ({f.name})", expanded=not profile_file and n == base_name):
             st.code(f.read_text(encoding="utf-8"), language="yaml")
+
+
+# ----------------------------------------------------------------------------
+# History: saved snapshots over time, and your actual net worth vs projections
+# ----------------------------------------------------------------------------
+
+with tabs["History"]:
+    if store is None:
+        st.info(store_note)
+    elif not store_open:
+        st.info("Unlock the Saved plans panel at the top to see your history.")
+    else:
+        try:
+            snaps = store.snapshots()
+            checkins = store.checkins()
+        except StorageError as exc:
+            st.error(f"Couldn't read history: {exc}")
+            snaps, checkins = [], []
+
+        st.subheader("How the outlook has changed")
+        snap_plans = sorted({s.get("plan", "") for s in snaps})
+        if not snap_plans:
+            st.caption("No snapshots yet. Save a plan (Saved plans panel at the top) to record "
+                       "today's results; save it again later to see how they move.")
+        else:
+            hp = st.selectbox("Plan", snap_plans,
+                              index=_idx(snap_plans, lambda n: n == PLAN.get("name")))
+            ps = [s for s in snaps if s.get("plan") == hp]
+            hist = pd.DataFrame([{"Date": s["date"], "Option": o["name"],
+                                  "Median at 65": o.get("median_65"), "P10": o.get("p10_65"),
+                                  "P90": o.get("p90_65"), "P(fail)": o.get("p_fail"),
+                                  "FI age": o.get("fi_age"), "Note": s.get("note", "")}
+                                 for s in ps for o in s.get("options", [])])
+            if len({s["date"] for s in ps}) > 1:
+                show_chart(alt.Chart(hist).mark_line(point=True, strokeWidth=2.5).encode(
+                    x=alt.X("Date:T", title=None),
+                    y=alt.Y("Median at 65:Q", title="Median net worth at 65",
+                            axis=alt.Axis(format="$,.2s")),
+                    color=alt.Color("Option:N"),
+                    tooltip=["Date:T", "Option:N", alt.Tooltip("Median at 65:Q", format="$,.0f")],
+                ).properties(height=300), width="stretch")
+            else:
+                st.caption("Snapshots from one day so far. Save the plan again on a later day "
+                           "(or after changing assumptions) to see a trend.")
+            st.dataframe(hist, hide_index=True, width="stretch", column_config={
+                "Median at 65": st.column_config.NumberColumn(format="dollar"),
+                "P10": st.column_config.NumberColumn(format="dollar"),
+                "P90": st.column_config.NumberColumn(format="dollar"),
+                "P(fail)": st.column_config.NumberColumn(format="percent"),
+                "FI age": st.column_config.NumberColumn(format="%.0f"),
+            })
+
+        st.subheader("Your actual net worth")
+        st.caption("Log your real net worth now and then (all accounts minus debts, in that "
+                   "day's dollars). Each check-in is compared with the projection from the "
+                   "latest snapshot saved on or before that date, after removing inflation.")
+        with st.form("checkin", clear_on_submit=True):
+            fc1, fc2 = st.columns(2)
+            ci_date = fc1.date_input("Date", value=date.today())
+            ci_nw = fc2.number_input("Net worth ($)", value=0.0, step=1000.0)
+            ci_note = st.text_input("Note (optional)", placeholder="e.g. after bonus, new job")
+            if st.form_submit_button("Save check-in"):
+                try:
+                    store.add_checkin({"date": ci_date.isoformat(), "net_worth": float(ci_nw),
+                                       "note": ci_note.strip()})
+                    st.rerun()
+                except StorageError as exc:
+                    st.error(f"Couldn't save: {exc}")
+
+        if checkins:
+            rows = []
+            for c in checkins:
+                prior = [s for s in snaps if s.get("date", "") <= c["date"] and s.get("band")]
+                ref = max(prior, key=lambda s: s["date"]) if prior else None
+                row = {"Date": c["date"], "Net worth": c["net_worth"], "Note": c.get("note", "")}
+                if ref:
+                    yrs = years_between(ref["date"], c["date"])
+                    real = to_todays_dollars(c["net_worth"], yrs, ref.get("inflation", 0.025))
+                    p50 = ref["band"]["p50"]
+                    lo = min(int(yrs), len(p50) - 1)
+                    hi = min(lo + 1, len(p50) - 1)
+                    w = min(max(yrs - lo, 0.0), 1.0)
+                    row.update({"Projection from": f"{ref['plan']} ({ref['date']})",
+                                "Projected median": p50[lo] * (1 - w) + p50[hi] * w,
+                                "Your percentile": percentile_of(real, ref["band"], yrs)})
+                rows.append(row)
+            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", column_config={
+                "Net worth": st.column_config.NumberColumn(format="dollar"),
+                "Projected median": st.column_config.NumberColumn(format="dollar"),
+                "Your percentile": st.column_config.NumberColumn(
+                    format="%.0f", help="Where you sit among the simulated lives at that date "
+                                        "(50 = right on the median)."),
+            })
+            banded = [s for s in snaps if s.get("band")]
+            if banded:
+                ref = min(banded, key=lambda s: s["date"])
+                d0 = pd.Timestamp(ref["date"])
+                n = len(ref["band"]["p50"])
+                band_df = pd.DataFrame({
+                    "Date": [d0 + pd.DateOffset(years=k) for k in range(n)],
+                    **{k: ref["band"][k] for k in ("p10", "p25", "p50", "p75", "p90")}})
+                last = max(pd.Timestamp(c["date"]) for c in checkins)
+                band_df = band_df[band_df["Date"] <= max(last + pd.DateOffset(years=2),
+                                                         d0 + pd.DateOffset(years=3))]
+                pts = pd.DataFrame([{"Date": pd.Timestamp(c["date"]),
+                                     "Net worth": to_todays_dollars(
+                                         c["net_worth"], years_between(ref["date"], c["date"]),
+                                         ref.get("inflation", 0.025))} for c in checkins])
+                y = alt.Y("p10:Q", title=f"Net worth ({ref['date'][:4]} dollars)",
+                          axis=alt.Axis(format="$,.2s"))
+                outer = alt.Chart(band_df).mark_area(opacity=0.15).encode(
+                    x=alt.X("Date:T", title=None), y=y, y2="p90:Q")
+                inner = alt.Chart(band_df).mark_area(opacity=0.25).encode(
+                    x="Date:T", y="p25:Q", y2="p75:Q")
+                mid = alt.Chart(band_df).mark_line(strokeDash=[4, 4]).encode(x="Date:T", y="p50:Q")
+                dots = alt.Chart(pts).mark_circle(size=90, color="#d62728").encode(
+                    x="Date:T", y="Net worth:Q",
+                    tooltip=["Date:T", alt.Tooltip("Net worth:Q", format="$,.0f")])
+                show_chart(alt.layer(outer, inner, mid, dots).properties(height=300),
+                           width="stretch")
+                st.caption(f"Bands: the {ref['reference']} projection saved {ref['date']} "
+                           f"({ref['plan']}); darker = middle half of lives, lighter = 10th to "
+                           "90th percentile, dashed = median. Dots: your check-ins.")
+            with st.popover("Delete a check-in"):
+                del_day = st.selectbox("Check-in", [c["date"] for c in checkins], key="del_ci")
+                if st.button("Delete", key="confirm_del_ci"):
+                    try:
+                        store.delete_checkin(del_day)
+                        st.rerun()
+                    except StorageError as exc:
+                        st.error(f"Couldn't delete: {exc}")
