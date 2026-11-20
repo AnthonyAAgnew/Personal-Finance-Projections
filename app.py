@@ -14,9 +14,11 @@ reference and can save the edits as a small override file that ``extends`` it.
 
 from __future__ import annotations
 
+import gc
 import hmac
 import json
 import sys
+from collections import OrderedDict
 from datetime import date
 from dataclasses import replace
 from pathlib import Path
@@ -106,26 +108,68 @@ st.markdown("""<style>
 # ----------------------------------------------------------------------------
 
 
+#: Memory the shared result cache may hold. Streamlit Community Cloud stops an
+#: app that goes much past ~1 GB, and one 10,000-path result is ~55 MB.
+CACHE_BYTES = 450_000_000
+
+
 @st.cache_resource
-def _cache() -> dict:
-    return {}
+def _cache() -> OrderedDict:
+    return OrderedDict()
+
+
+def _nbytes(obj) -> int:
+    if isinstance(obj, np.ndarray):
+        return obj.nbytes
+    if isinstance(obj, dict):
+        return sum(_nbytes(v) for v in obj.values())
+    if hasattr(obj, "net_worth"):  # a Result
+        return sum(_nbytes(v) for v in vars(obj).values())
+    return 0
+
+
+def _compact(r):
+    """Store float arrays as float32: half the memory, still exact to cents on millions."""
+    for k, v in vars(r).items():
+        if isinstance(v, np.ndarray) and v.dtype == np.float64:
+            setattr(r, k, v.astype(np.float32))
+        elif isinstance(v, dict) and any(isinstance(x, np.ndarray) for x in v.values()):
+            setattr(r, k, {n: x.astype(np.float32) if isinstance(x, np.ndarray)
+                           and x.dtype == np.float64 else x for n, x in v.items()})
+    return r
+
+
+def _remember(key, value):
+    """Add to the cache, dropping the least recently used entries over the budget."""
+    cache = _cache()
+    cache[key] = value
+    cache.move_to_end(key)
+    total = sum(_nbytes(v) for v in cache.values())
+    dropped = False
+    while total > CACHE_BYTES and len(cache) > 1:
+        _, old = cache.popitem(last=False)
+        total -= _nbytes(old)
+        dropped = True
+    if dropped:
+        gc.collect()  # results sit in reference cycles; free them now, not later
+    return value
 
 
 def run(s):
     cache = _cache()
-    if s not in cache:
-        if len(cache) > 64:
-            cache.clear()
-        cache[s] = simulate(s)
-    return cache[s]
+    if s in cache:
+        cache.move_to_end(s)
+        return cache[s]
+    return _remember(s, _compact(simulate(s)))
 
 
 def run_sensitivity(s, steps: Steps):
     cache = _cache()
     key = ("sensitivity", s, steps)
-    if key not in cache:
-        cache[key] = analyze(s, steps, base=run(s))
-    return cache[key]
+    if key in cache:
+        cache.move_to_end(key)
+        return cache[key]
+    return _remember(key, analyze(s, steps, base=run(s)))
 
 
 def load_all(mode: str, profile: Path | None = None, life=(), strategy: Path | None = None,
