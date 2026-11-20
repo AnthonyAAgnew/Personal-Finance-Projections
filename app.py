@@ -17,6 +17,7 @@ from __future__ import annotations
 import gc
 import hmac
 import json
+import os
 import sys
 from collections import OrderedDict
 from datetime import date
@@ -108,9 +109,13 @@ st.markdown("""<style>
 # ----------------------------------------------------------------------------
 
 
-#: Memory the shared result cache may hold. Streamlit Community Cloud stops an
-#: app that goes much past ~1 GB, and one 10,000-path result is ~55 MB.
-CACHE_BYTES = 450_000_000
+#: Streamlit Community Cloud mounts the repo under /mount/src and stops an app
+#: that goes much past ~1 GB. One 10,000-path simulation needs ~380 MB while it
+#: runs and keeps ~55 MB, so the hosted app runs fewer paths and caches less.
+HOSTED = Path("/mount/src").exists() or os.environ.get("STATS_HOSTED") == "1"
+
+#: Memory the shared result cache may hold.
+CACHE_BYTES = 250_000_000 if HOSTED else 450_000_000
 
 
 @st.cache_resource
@@ -511,9 +516,12 @@ with setup_right:
 
 with sim:
     st.caption("Applied to every option, so comparisons stay fair.")
-    PATH_OPTIONS = [1000, 2000, 5000, 10000, 20000, 50000]
+    PATH_OPTIONS = [1000, 2000, 5000, 10000] + ([] if HOSTED else [20000, 50000])
+    default_paths = min(base.paths, 5000) if HOSTED else base.paths
     paths = st.select_slider("Paths", PATH_OPTIONS, key=wk("paths"),
-                             value=pv("paths") if pv("paths") in PATH_OPTIONS else base.paths)
+                             value=pv("paths") if pv("paths") in PATH_OPTIONS else default_paths,
+                             help="The hosted app is limited to 10,000 paths to stay within "
+                                  "its memory; 5,000 moves medians by about 1%." if HOSTED else None)
     seed = st.number_input("Random seed", value=int(pv("seed", base.seed)), step=1, key=wk("seed"))
     floor = st.number_input("Failure floor ($)", value=float(pv("floor", base.failure_floor)),
                             step=5000.0, key=wk("floor"))
