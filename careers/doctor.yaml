@@ -1,7 +1,7 @@
 name: Physician (MD after Ph.D.)
 description: >
-  Work as an R&D engineer for one application year, then medical school
-  (4 years, financed with loans), residency, and attending practice. If not
+  Work as an R&D engineer for three years after the Ph.D. (MCAT, clinical
+  hours, one application cycle), then medical school (4 years, loans), residency, and attending practice. If not
   admitted, you stay an R&D engineer. Primary care or specialty is uncertain.
 
 sources:
@@ -14,11 +14,13 @@ sources:
   - "Current Population Survey analysis: doctors under 36 work 54.1 hrs/week, 36+ work 50.7"
   - "AAMC (via secondary summaries): median 2025-26 cost of attendance $75,654/yr at public MD schools; median debt $215,000 among indebted graduates: https://students-residents.aamc.org/financial-aid-resources/you-can-afford-medical-school"
   - "AAMC 2025 resident stipend survey: PGY-1 average $68,166: https://www.aamc.org/data/stipend/"
+  - "Medical Economics: 23,440 MD matriculants in 2025-26 (~43% of ~54,700 applicants): https://www.medicaleconomics.com/view/u-s-medical-school-enrollment-hits-a-record-high-in-2025"
+  - "AAMC FACTS Table A-23 (acceptance by MCAT and GPA), via secondary summaries: https://www.aamc.org/data-reports/students-residents/data/facts-applicants-and-matriculants"
   - "Medscape 2026 report via Advisory Board: primary care average $298k, specialists $417k: https://www.advisory.com/daily-briefing/2026/06/04/physician-compensation"
 
 assumptions:
-  - "Applies during year 4 (right after the Ph.D.) while working as an R&D engineer ($150k)."
-  - "60% chance of admission (CHECK). National acceptance is about 40%; a Ph.D. applicant is usually stronger, but this is a guess."
+  - "Three years as an R&D engineer ($150k) after the Ph.D. (years 4-6, ages 26-28) for the MCAT, clinical hours and the application cycle; medical school starts in year 7 (age 29). Prep time on top of the 44-hour work week is not counted."
+  - "60% chance of admission. AAMC: 42.9% of all MD applicants matriculated in 2025-26; acceptance is ~60% for a 3.60-3.79 GPA with a 510-513 MCAT and ~83% for 3.80+ with 518+ (AAMC Table A-23). CHECK once you have an MCAT score: your GPA and MCAT matter far more than the Ph.D."
   - "Cost of attendance $75,654/yr covers tuition and living, so your normal budget categories pause during school."
   - "All 4 years of cost borrowed at a blended 8.5% nominal (federal direct plus private). New 2026 federal caps limit professional students to $50k/yr, so part of this is likely private. Repaid over 10 years, starting once residency ends."
   - "Residency at $68k: 3 years for primary care (60% chance) then $298k; 5 years for a specialty (40%) then $417k."
@@ -44,7 +46,7 @@ events:
     type: set_amount
     target: Career pay
     amount: 0
-    year: 5
+    year: 7
     duration: 4
     probability: 0.6
   - name: School covers living costs

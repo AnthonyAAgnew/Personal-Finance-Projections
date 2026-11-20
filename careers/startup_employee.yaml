@@ -9,10 +9,11 @@ sources:
   - "Hours: Antler 2025 founder survey via The Next Web: ~75% of founders work 60+ hrs/week, 19% 80+; Australian venture-backed founders average 64: https://thenextweb.com/news/european-startup-founders-work-long-hours"
   - "Autonomy: O*NET work context 'Freedom to Make Decisions' (0-100; 75 = some freedom, 100 = a lot): https://www.onetonline.org/find/descriptor/result/4.C.3.a.4"
   - "Burnout and satisfaction: Jellyfish 2024 State of Engineering Management (604 respondents): 65% burned out in the past year (85% on teams under 10), 46% of engineers say their team is burned out, 75% find their work rewarding: https://jellyfish.co/blog/2024-state-of-engineering-management-report/"
+  - "Carta H1 2025 State of Startup Compensation: average new engineering hire salary ~$189k: https://carta.com/data/startup-compensation-h1-2025-full-report/"
   - "Carta: after Series A the median employee option pool is ~12% (founders ~56%): https://carta.com/data/linkedin-founder-vs-employee-ownership-over-time/"
 
 assumptions:
-  - "Salary ~$150k, a bit below big-company total pay. CHECK"
+  - "Salary ~$150k. Carta: new engineering hires at startups averaged ~$189k in mid-2025, but that is software-heavy; an equity-heavy early offer at a device startup usually pays below market, and big-company R&D pays ~$150k. CHECK against real offers."
   - "10% yearly chance the startup folds or you are cut (lose ~40% of that year's pay while job hunting)."
   - "Equity, around age 34 (+-3): 10% chance of a modest payout (median $500k), 3% chance of a big one (median $3M); 87% nothing. Taxed at a flat 25%. CHECK: no public data on employee payout rates was found."
   - "Hours: 50/week. No survey of early startup employees was found; set between engineers' 43-45 and founders' 60+ (CHECK)."

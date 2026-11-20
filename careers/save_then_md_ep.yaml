@@ -1,15 +1,15 @@
 extends: cardiology_ep.yaml
 name: Industry first, then MD / EP
 description: >
-  Work in med device R&D for about three years after the Ph.D. to build
-  savings, then start medical school and the cardiology / EP ladder. Same
+  Work in med device R&D for about four years after the Ph.D. (one more
+  than the minimum three) to build savings, then start medical school and the cardiology / EP ladder. Same
   training and outcomes as the EP path, three years later, with a cushion
   of savings going in.
 
 assumptions:
-  - "Admitted to medical school around age 30 (after three industry years) instead of 27."
+  - "Admitted to medical school around age 30 (after four industry years) instead of 29."
   - "Admission chance 65% (vs 60%): industry experience can strengthen an application (CHECK)."
-  - "Everything after admission (school, residency, fellowships, pay, loans) follows the EP path, shifted three years. Full EP pay starts around age 42."
+  - "Everything after admission (school, residency, fellowships, pay, loans) follows the EP path, shifted one year. Full EP pay starts around age 42."
 
 events:
   - name: Admitted to med school
