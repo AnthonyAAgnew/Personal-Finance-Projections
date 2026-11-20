@@ -8,10 +8,11 @@ description: >
 sources:
   - "Getinge corporate medical officer posting: base $286k-$375k plus 50% annual bonus: https://www.career.com/job/getinge/corporate-medical-officer-us-or-eur-remote/j202603162002008212273"
   - "Device CMO postings: base ~$200k-$450k plus bonus and equity (JRG Partners): https://www.jrgpartners.com/?p=33911"
+  - "Payscale, Medical Director (Industrial), 2025: experienced total pay ~$238k-$416k: https://payscale.com/research/US/Job=Medical_Director%2C_Industrial/Salary/a264d447/Experienced"
 
 assumptions:
-  - "Around age 36 (about 3-5 years after residency), move to industry as a medical director at ~$330k total."
-  - "40% chance of becoming CMO around age 42 (+-2) at ~$520k total (base + bonus; equity not modeled). CHECK"
+  - "Around age 41 (about 5 years after an internal medicine residency), move to industry as a medical director at ~$330k total."
+  - "40% chance of becoming CMO around age 47 (+-2) at ~$520k total (base + bonus; equity not modeled). CHECK"
   - "Hours: 50 as medical director, 55 as CMO (CHECK: no survey found; set near the physician average of 50)."
   - "Autonomy 72 (Medical and Health Services Managers). Burnout 40% (CHECK: industry roles have less clinical load). Satisfaction 73%."
 

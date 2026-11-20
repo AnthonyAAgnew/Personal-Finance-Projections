@@ -133,7 +133,7 @@ def test_careers_share_market_draws_and_differ_in_pay():
 
 def test_doctor_paths_split_by_admission():
     res = simulate(compose(PROFILE, ROOT / "careers" / "doctor.yaml", paths=4000))
-    in_school = res.income[:, 5] < 1000  # year 5 is the second year of med school
+    in_school = res.income[:, 8] < 1000  # year 8 is the second year of med school
     assert in_school.mean() == pytest.approx(0.6, abs=0.03)
 
 

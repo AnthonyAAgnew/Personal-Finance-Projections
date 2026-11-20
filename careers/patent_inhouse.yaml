@@ -15,35 +15,38 @@ sources:
 
 assumptions:
   - "Living costs during law school are borrowed too: ~$30k a year (less in 2L, when the summer associate job pays ~$40k), at the same 8% and 10-year term. ABA cost-of-attendance budgets include similar living allowances (CHECK)."
-  - "Full-time JD in years 4-6 (ages 26-28) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
+  - "One year as an R&D engineer ($150k, year 4), one year studying for the LSAT and applying with no pay (year 5, CHECK: you may be able to study while working), then a full-time JD in years 6-8 (ages 28-30) at ~$50k/yr tuition, all borrowed at ~8% (federal grad rates are near 8%; 2026 federal caps may push part of it private). Living costs stay at your Ph.D.-level budget. Repaid over 10 years from graduation."
   - "A 2L summer associate job pays ~$40k (CHECK)."
-  - "Three years at an IP firm at ~$200k, then in-house around age 32 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
-  - "35% chance of head of IP / chief IP counsel around age 40 at ~$420k. CHECK"
+  - "Three years at an IP firm at ~$200k, then in-house around age 34 at ~$250k total (base + bonus + stock). CHECK: AIPLA's corporate figures are members-only."
+  - "35% chance of head of IP / chief IP counsel around age 42 at ~$420k. CHECK"
   - "Hours: 50 in law school (CHECK), 50 at the firm (~1,800 billable), 45 in-house (CHECK)."
   - "Autonomy 92 (Lawyers). Burnout 38% (below the 42% attorney average, CHECK). Satisfaction 55% (Axiom 2024: 54% low satisfaction or open to leaving, CHECK)."
 
 income:
-  - {name: Career pay, amount: 200000, start_year: 7, growth: {mean: 0.015, stdev: 0.03}, noise: 0.08, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
-  - {name: Summer associate, amount: 40000, start_year: 5, end_year: 6, taxable: true}
-  - {name: Employer 401(k) match, amount: 10000, start_year: 7, end_year: 43, spendable: false}
+  - {name: Career pay, amount: 200000, start_year: 9, growth: {mean: 0.015, stdev: 0.03}, noise: 0.08, loss_probability: 0.02, loss_fraction: 0.4, taxable: true}
+  - {name: Summer associate, amount: 40000, start_year: 7, end_year: 8, taxable: true}
+  - {name: Employer 401(k) match, amount: 10000, start_year: 9, end_year: 43, spendable: false}
+  - {name: Engineer pay before law school, amount: 150000, start_year: 4, end_year: 5, taxable: true}
 
 time:
-  - {name: Work hours, amount: 50, start_year: 4}
+  - {name: Work hours, amount: 44, start_year: 4}           # engineer, year 4
 
 events:
-  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 4}
-  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 5}
-  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 6}
-  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 4}
-  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 5}
-  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 6}
-  - {name: Law living loan 1L, type: loan, amount: 30000, rate: 0.08, defer: 3, term: 10, year: 4}
-  - {name: Law living loan 2L, type: loan, amount: 20000, rate: 0.08, defer: 2, term: 10, year: 5}
-  - {name: Law living loan 3L, type: loan, amount: 30000, rate: 0.08, defer: 1, term: 10, year: 6}
-  - {name: Firm hours, type: set_amount, target: Work hours, amount: 50, year: 7}
-  - {name: Joins in-house team, type: set_amount, target: Career pay, amount: 250000, year: 10, jitter: 1, confidence: medium}
+  - {name: Studies for the LSAT and applies, type: set_amount, target: Work hours, amount: 40, year: 5}  # CHECK
+  - {name: Law school hours, type: set_amount, target: Work hours, amount: 50, year: 6}
+  - {name: Law school tuition 1L, type: purchase, amount: 50000, year: 6}
+  - {name: Law school tuition 2L, type: purchase, amount: 50000, year: 7}
+  - {name: Law school tuition 3L, type: purchase, amount: 50000, year: 8}
+  - {name: Law loan 1L, type: loan, amount: 50000, rate: 0.08, defer: 3, term: 10, year: 6}
+  - {name: Law loan 2L, type: loan, amount: 50000, rate: 0.08, defer: 2, term: 10, year: 7}
+  - {name: Law loan 3L, type: loan, amount: 50000, rate: 0.08, defer: 1, term: 10, year: 8}
+  - {name: Law living loan 1L, type: loan, amount: 30000, rate: 0.08, defer: 3, term: 10, year: 6}
+  - {name: Law living loan 2L, type: loan, amount: 20000, rate: 0.08, defer: 2, term: 10, year: 7}
+  - {name: Law living loan 3L, type: loan, amount: 30000, rate: 0.08, defer: 1, term: 10, year: 8}
+  - {name: Firm hours, type: set_amount, target: Work hours, amount: 50, year: 9}
+  - {name: Joins in-house team, type: set_amount, target: Career pay, amount: 250000, year: 12, jitter: 1, confidence: medium}
   - {name: In-house hours (patent counsel), type: set_amount, target: Work hours, amount: 45, same_time_as: Joins in-house team}
-  - {name: Head of IP, type: set_amount, target: Career pay, amount: 420000, year: 18, jitter: 2, probability: 0.35, confidence: low}
+  - {name: Head of IP, type: set_amount, target: Career pay, amount: 420000, year: 20, jitter: 2, probability: 0.35, confidence: low}
 
 # Non-financial scores for the Decide tab (see sources and assumptions).
 quality: {autonomy: 92, satisfaction: 0.55, burnout: 0.38}

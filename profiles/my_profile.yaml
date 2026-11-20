@@ -26,11 +26,13 @@ sources:
   - "Hours: HEPI analysis of the Nature 2019 PhD survey: PhD students average 47 hrs/week: https://www.hepi.ac.uk/2020/06/25/new-report-shows-phd-students-work-50-more-than-undergraduates/"
   - "Hours: BLS 2024: 11.1% of workers 25-54, 14.2% of 55-64 and 38.3% of 65+ work part time: https://www.bls.gov/opub/ted/2025/38-3-percent-of-employed-older-americans-worked-part-time-in-2024.htm"
 
-# $60k today: $20k cash reserve + $40k invested. CHECK: replace with your real split.
+# $60k today (Nov 2026): $50k cash + $10k invested. Another ~$5-10k of other
+# assets (car, belongings) is left out. No debt: the car is paid off and the
+# credit card is paid in full each month.
 portfolio:
-  starting_balance: 40000  # invested
+  starting_balance: 10000  # invested
   cash:
-    balance: 20000         # emergency fund / checking
+    balance: 50000         # checking, savings, emergency fund
     reserve_months: 6      # savings refill the reserve to 6 months of spending first
     mean: 0.03             # nominal cash yield (T-bills averaged ~3.3% since 1928)
     stdev: 0.01
@@ -49,7 +51,7 @@ portfolio:
     stdev: 0.012
 
 # Tax-advantaged accounts. Contribution limits are the IRS 2025 figures, held
-# flat in today's dollars (limits are indexed to inflation). The $40k invested
+# flat in today's dollars (limits are indexed to inflation). The $10k invested
 # is assumed to be all taxable brokerage. CHECK: move any 401(k) or Roth money
 # you already have into traditional / roth below.
 accounts:
@@ -66,13 +68,13 @@ accounts:
 
 # Social Security from your own earnings record (SSA formula, 2025 figures,
 # today's dollars): 35 best years of Career pay, each capped at $176,100.
-# Ph.D. stipends are not Social Security wages. CHECK: the J&J years below
-# (count and average pay) and compare with your statement at ssa.gov/myaccount.
+# Ph.D. stipends are not Social Security wages. J&J: about $150k paid over 4
+# years (~$37.5k a year). Compare with your statement at ssa.gov/myaccount.
 social_security:
   stream: Social Security
   wage_streams: [Career pay]
   prior_years: 4
-  prior_earnings: 30000
+  prior_earnings: 37500
 
 income:
   - name: Ph.D. stipend
@@ -87,16 +89,18 @@ income:
     start_year: 45         # age 67, full retirement age
 
 # Budget categories, in today's dollars per month. These are your Ph.D.-era
-# amounts; the lifestyle tiers below raise them as your income grows.
+# amounts (Nov 2026: ~$1,650 housing, ~$1,000 food, ~$500 everything else =
+# $3,150); the lifestyle tiers below raise them as your income grows.
 expenses:
   - {name: Housing, monthly: 1650, growth: {mean: 0.005, stdev: 0.01}}   # rent, utilities included
-  - {name: Food, monthly: 600}
-  - {name: Transport, monthly: 250}
-  - {name: Health & insurance, monthly: 100}
-  - {name: Utilities & phone, monthly: 60}    # phone only while rent includes utilities. CHECK
-  - {name: Fun & dining, monthly: 200}
-  - {name: Travel, monthly: 100}
-  - {name: Shopping & other, monthly: 150}
+  - {name: Food, monthly: 1000}
+  # The ~$500 of everything else, split across categories (the split is a guess).
+  - {name: Transport, monthly: 150}           # car paid off: insurance, gas, upkeep
+  - {name: Health & insurance, monthly: 50}
+  - {name: Utilities & phone, monthly: 50}    # phone only while rent includes utilities
+  - {name: Fun & dining, monthly: 100}
+  - {name: Travel, monthly: 75}
+  - {name: Shopping & other, monthly: 75}
   - {name: Giving, monthly: 0}
   - name: Healthcare in retirement
     amount: 8000

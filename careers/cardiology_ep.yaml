@@ -4,7 +4,7 @@ description: >
   medicine residency (3), cardiology fellowship (3), then electrophysiology
   fellowship (2). Each step can fail: not admitted (stay an R&D engineer),
   no cardiology fellowship (hospitalist), or no EP fellowship (general
-  cardiologist). Full EP pay starts around age 39.
+  cardiologist). Full EP pay starts around age 41.
 
 extends: doctor.yaml
 
@@ -12,14 +12,15 @@ sources:
   - "MedAxiom 2026 survey (2025 data, 205 programs) via Becker's: EP median total compensation ~$803k: https://www.beckersasc.com/cardiology/cardiologist-compensation-hits-record-highs-10-numbers-to-know/"
   - "Marit Health via Becker's: electrophysiologists average ~$708k: https://www.beckersasc.com/cardiology/the-cardiologist-paycheck-in-2026-10-numbers-to-know/"
   - "Medscape 2025 via Becker's: general cardiologists average ~$520k: https://www.beckersasc.com/cardiology/10-stats-to-know-on-cardiologist-pay-in-2025"
-  - "NRMP 2025 Medicine and Pediatric Specialties Match: 73.8% of applicants preferring an IM subspecialty matched: https://www.nrmp.org/wp-content/uploads/2025/12/2025-Medicine-and-Pediatric-Specialties-MRS-Report.pdf"
+  - "NRMP 2025 Medicine and Pediatric Specialties Match: cardiovascular disease 1,347 positions, 63.5% of 2,118 applicants preferring it matched (US MD graduates were 51% of matches); clinical cardiac electrophysiology 150 positions, 82.5% of 177 applicants matched: https://www.nrmp.org/wp-content/uploads/2025/12/2025-Medicine-and-Pediatric-Specialties-MRS-Report.pdf"
+  - "MGMA 2024 provider compensation (Eastern region extract): internal medicine hospitalist median total pay $319k (P25 $283k, P75 $368k): https://files-profile.medicine.yale.edu/documents/784eb971-e9df-4184-a00d-7f8891aea2d0"
 
 assumptions:
   - "Same application year, admission chance (60%), school costs and 8.5% loans as the physician path. Loan repayment starts 3 years after school, so you repay during fellowship."
   - "Internal medicine residency 3 years at ~$68k, then a fellowship stipend of ~$78k for cardiology and EP years (PGY-4 to PGY-8). CHECK"
-  - "65% chance of a cardiology fellowship (CHECK; NRMP reports 74% across IM subspecialties, and cardiology is among the more competitive). Otherwise a hospitalist at ~$300k from age 34."
-  - "75% of cardiology fellows who want EP get an EP fellowship (CHECK). Otherwise a general cardiologist at ~$520k from age 37."
-  - "EP attending at $700k from age 39: below the MedAxiom median ($803k), since that survey leans to private programs and total pay includes call and directorships. CHECK"
+  - "65% chance of a cardiology fellowship (NRMP 2025: 63.5% of all applicants preferring cardiology matched; US MD graduates likely do a little better). Otherwise a hospitalist at ~$320k (MGMA median $319k) from age 36."
+  - "80% of cardiology fellows who want EP get an EP fellowship (NRMP 2025: 82.5% of EP applicants matched). Otherwise a general cardiologist at ~$520k from age 39."
+  - "EP attending at $700k from age 41: below the MedAxiom median ($803k), since that survey leans to private programs and total pay includes call and directorships. CHECK"
   - "Hours: residency 67 (AMA 2025); fellowship 62 (CHECK: between residents' 67 and trained physicians' 58); EP attending 58 (AMA 58.4); general cardiologist 56 (Medscape 56.2); hospitalist 45 (shift-based 7-on/7-off schedules, CHECK)."
   - "Autonomy 96 (internal medicine physicians; O*NET does not list cardiologists separately). Burnout 38% (Medscape 2025 cardiology). Satisfaction 82%: between 73% for all physicians and 92% of cardiologists who would choose cardiology again (CHECK)."
 
@@ -42,7 +43,7 @@ events:
     confidence: medium
     type: set_amount
     target: Career pay
-    amount: 300000
+    amount: 320000
     same_time_as: Admitted to med school
     offset: 7
     group: cardiology
@@ -54,7 +55,7 @@ events:
     same_time_as: Cardiology fellowship
     offset: 3
     group: ep
-    probability: 0.75
+    probability: 0.8
   - name: General cardiologist
     confidence: medium
     type: set_amount
@@ -63,7 +64,7 @@ events:
     same_time_as: Cardiology fellowship
     offset: 3
     group: ep
-    probability: 0.25
+    probability: 0.2
   - name: EP attending
     confidence: low
     type: set_amount

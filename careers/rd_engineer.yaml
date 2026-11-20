@@ -12,6 +12,7 @@ sources:
   - "BLS OOH, Bioengineers and biomedical engineers: median $106,950 (May 2024): https://www.bls.gov/OOH/architecture-and-engineering/biomedical-engineers.htm"
   - "O*NET national wages 17-2031 (10th $71,850 / 90th $168,180): https://www.onetonline.org/link/localwages/17-2031.00"
   - "Levels.fyi Medtronic: senior engineer ~$141k, principal ~$156-159k, senior principal up to ~$201k: https://www.levels.fyi/companies/medtronic/salaries/mechanical-engineer"
+  - "Levels.fyi Edwards Lifesciences (2026): principal engineer (E4) ~$158k total ($149k base): https://www.levels.fyi/companies/edwards-lifesciences/salaries/mechanical-engineer"
 
 assumptions:
   - "Enters at $150k total pay (between Medtronic senior and principal; a Ph.D. plus prior J&J years usually places above the BLS 90th percentile of all biomedical engineers)."
